@@ -1,0 +1,9 @@
+# templates/Caddyfile
+# {$DOMAIN} is passed by your environment or set directly
+{$DOMAIN} {
+    # Reverse proxy to the internal container service
+    reverse_proxy webapp:3000
+    
+    # Optional: Enable compression for better performance
+    encode gzip
+}

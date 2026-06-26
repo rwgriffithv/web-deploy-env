@@ -1,0 +1,41 @@
+# templates/docker-compose.yml
+services:
+  # The Web Application
+  webapp:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: prod
+    restart: unless-stopped
+    volumes:
+      # Keep your SQLite database persistent
+      - ./data/sqlite:/app/data
+    environment:
+      - DATABASE_URL=file:/app/data/prod.db
+      - DOMAIN=${DOMAIN}
+
+  # The Caddy Reverse Proxy
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - webapp
+
+  # The Cloudflare Tunnel
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+
+volumes:
+  caddy_data:
+  caddy_config:

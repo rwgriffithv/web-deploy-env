@@ -1,0 +1,58 @@
+# =========================
+# OS Generated Files
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =========================
+# Editor & IDE Files
+# =========================
+# Ignore personal VS Code settings (but keep .vscode/extensions.json if you add one)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# IntelliJ / JetBrains
+.idea/
+*.iml
+
+# Vim/Emacs
+*.swp
+*.swo
+*~
+
+# =========================
+# Environment Variables
+# =========================
+# Protects API keys if you ever use Claude/OpenAI alongside Ollama
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =========================
+# Logs
+# =========================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Scripting / Local Testing
+# =========================
+# In case you write Python or Node helper scripts in the future
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
