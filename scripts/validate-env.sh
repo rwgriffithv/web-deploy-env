@@ -17,7 +17,7 @@ if ! command -v envsubst &> /dev/null; then
 fi
 
 # 2. Check for required variables
-REQUIRED_VARS=("DOMAIN" "TUNNEL_TOKEN")
+REQUIRED_VARS=("DOMAIN" "TUNNEL_TOKEN" "IMAGE_REGISTRY")
 
 for var in "${REQUIRED_VARS[@]}"; do
     if [[ -z "${!var:-}" ]]; then

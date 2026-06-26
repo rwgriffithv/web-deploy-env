@@ -17,34 +17,44 @@ if [ -f "${PARENT_DIR}/.env" ]; then
 fi
 "${SUBMODULE_DIR}/scripts/validate-env.sh"
 
-# Set defaults
-export DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-my-org/agent-dev-env:latest}"
-export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-my-org/web-deploy-base:latest}"
+# Set defaults images
+export DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-${IMAGE_REGISTRY}/agent-dev-env:latest}"
+export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-${IMAGE_REGISTRY}/web-deploy-base:latest}"
 
 FORCE_OVERWRITE="${FORCE_OVERWRITE:-false}"
 if [[ "${1:-}" == "--force" ]]; then FORCE_OVERWRITE=true; fi
 
 log() { printf "[web-deploy-env] %s\n" "$*"; }
 
-# 1. Process Dockerfile Template
+# 1. Build Base Image (Idempotent with --force support)
+image_exists=$(docker images -q "${PROD_BASE_IMAGE}" 2> /dev/null || true)
+
+if [[ -z "$image_exists" || "$FORCE_OVERWRITE" == true ]]; then
+    log "Building base image: ${PROD_BASE_IMAGE}..."
+    docker build -t "${PROD_BASE_IMAGE}" -f "${SUBMODULE_DIR}/Dockerfile.base" "${SUBMODULE_DIR}"
+else
+    log "Base image ${PROD_BASE_IMAGE} already exists. Skipping build."
+fi
+
+# 2. Process Dockerfile Template
 mkdir -p "${PARENT_DIR}/deploy"
 DOCKERFILE_DEST="${PARENT_DIR}/deploy/Dockerfile"
 
 if [[ ! -f "$DOCKERFILE_DEST" || "$FORCE_OVERWRITE" == true ]]; then
     log "Generating ./deploy/Dockerfile from template..."
-    # envsubst replaces ${VARIABLES} in the file with their exported values
+    # Note: ensure variables used in templates/Dockerfile are exported
+    export DEV_BASE_IMAGE PROD_BASE_IMAGE
     envsubst < "${SUBMODULE_DIR}/templates/Dockerfile" > "$DOCKERFILE_DEST"
 else
     log "Dockerfile already exists. Skipping."
 fi
 
-# 2. Copy/Link helper scripts and configs
+# 3. Sync infrastructure templates
 log "Syncing infrastructure templates..."
-
 ln -sf "${SUBMODULE_DIR}/templates/docker-compose.yml" "${PARENT_DIR}/"
 ln -sf "${SUBMODULE_DIR}/templates/Caddyfile" "${PARENT_DIR}/"
 
-# 3. Expose deployment and backup scripts
+# 4. Expose utility scripts
 log "Linking utility scripts..."
 for script in deploy backup; do
     ln -sf "${SUBMODULE_DIR}/scripts/${script}.sh" "${PARENT_DIR}/${script}.sh"
