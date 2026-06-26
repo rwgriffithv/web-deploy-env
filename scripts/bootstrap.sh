@@ -18,22 +18,25 @@ fi
 "${SUBMODULE_DIR}/scripts/validate-env.sh"
 
 # Set defaults images
+# NOTE: find agent-dev-env images from https://github.com/rwgriffithv/agent-dev-env
+# NOTE: if changing PROD_BASE_IMAGE, DEV_BASE_IMAGE should be rebuilt off of it
+DEFAULT_PROD_BASE_IMAGE="${IMAGE_REGISTRY}/web-deploy-base:latest}"
 export DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-${IMAGE_REGISTRY}/agent-dev-env:latest}"
-export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-${IMAGE_REGISTRY}/web-deploy-base:latest}"
+export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-${DEFAULT_PROD_BASE_IMAGE}}"
 
 FORCE_OVERWRITE="${FORCE_OVERWRITE:-false}"
 if [[ "${1:-}" == "--force" ]]; then FORCE_OVERWRITE=true; fi
 
 log() { printf "[web-deploy-env] %s\n" "$*"; }
 
-# 1. Build Base Image (Idempotent with --force support)
-image_exists=$(docker images -q "${PROD_BASE_IMAGE}" 2> /dev/null || true)
+# 1. Build Default Prod Base Image (Idempotent with --force support)
+image_exists=$(docker images -q "${DEFAULT_PROD_BASE_IMAGE}" 2> /dev/null || true)
 
 if [[ -z "$image_exists" || "$FORCE_OVERWRITE" == true ]]; then
-    log "Building base image: ${PROD_BASE_IMAGE}..."
-    docker build -t "${PROD_BASE_IMAGE}" -f "${SUBMODULE_DIR}/Dockerfile.base" "${SUBMODULE_DIR}"
+    log "Building default prod base image: ${DEFAULT_PROD_BASE_IMAGE}..."
+    docker build -t "${DEFAULT_PROD_BASE_IMAGE}" -f "${SUBMODULE_DIR}/Dockerfile.base" "${SUBMODULE_DIR}"
 else
-    log "Base image ${PROD_BASE_IMAGE} already exists. Skipping build."
+    log "Default prod base image ${DEFAULT_PROD_BASE_IMAGE} already exists. Skipping build."
 fi
 
 # 2. Process Dockerfile Template
@@ -42,8 +45,6 @@ DOCKERFILE_DEST="${PARENT_DIR}/deploy/Dockerfile"
 
 if [[ ! -f "$DOCKERFILE_DEST" || "$FORCE_OVERWRITE" == true ]]; then
     log "Generating ./deploy/Dockerfile from template..."
-    # Note: ensure variables used in templates/Dockerfile are exported
-    export DEV_BASE_IMAGE PROD_BASE_IMAGE
     envsubst < "${SUBMODULE_DIR}/templates/Dockerfile" > "$DOCKERFILE_DEST"
 else
     log "Dockerfile already exists. Skipping."

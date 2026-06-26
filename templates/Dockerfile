@@ -1,6 +1,5 @@
-# template/Dockerfile
-
 # 1. Start from the shared dev environment (Inherits system libs & Node)
+# NOTE: DEV_BASE_IMAGE should be built upon PROD_BASE_IMAGE
 FROM ${DEV_BASE_IMAGE} AS builder
 WORKDIR /app
 COPY . .
