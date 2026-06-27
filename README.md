@@ -32,10 +32,12 @@ parent-project/
 
 | Component | Purpose |
 | --- | --- |
+| **Configuration** | Setup the host with dependencies and bootstrap project configs. |
 | **Templates** | Standardized `Caddyfile`, `docker-compose.yml`, and `Dockerfile`. |
-| **Bootstrap** | Validates requirements and synchronizes infrastructure locally. |
 | **Deployment** | Multi-stage build and container orchestration logic. |
 | **Backup** | Automated snapshots for database/data volume recovery. |
+
+Because these components live in a shared repository, improvements can be rolled out across multiple projects simply by updating the Git submodule.
 
 ---
 
@@ -51,7 +53,7 @@ git submodule update --init --recursive
 
 ### 1. Configuration
 
-Create a `.env` file in your project root with the following requirements:
+Create/update the `.env` file in your project root with the following requirements:
 
 ```text
 DOMAIN=yourdomain.com
@@ -59,14 +61,17 @@ TUNNEL_TOKEN=your_cloudflare_tunnel_token
 
 ```
 
-### 2. Bootstrap
+### 2. Setup and Bootstrap
 
-Run the bootstrap script to generate the `deploy/` directory and create symlinks:
+Setup host dependencies and bootstrap the parent repository:
 
 ```bash
+./web-deploy-env/scripts/setup-host.sh
 ./web-deploy-env/scripts/bootstrap.sh
 
 ```
+
+The setup and bootstrap processes are idempotent.
 
 ---
 

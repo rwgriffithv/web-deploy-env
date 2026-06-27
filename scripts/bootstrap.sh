@@ -2,7 +2,7 @@
 #
 # scripts/bootstrap.sh
 #
-# Bootstraps a parent repository using the shared agent-dev-env submodule.
+# Bootstraps a parent repository using the shared web-deploy-env submodule.
 #
 set -euo pipefail
 
@@ -11,55 +11,108 @@ if [ -f ".env" ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
+########################################
+# Logging
+########################################
+
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+NC="\033[0m"
+
+info() { echo -e "${BLUE}==>${NC} $*"; }
+success() { echo -e "${GREEN}✓${NC} $*"; }
+warn() { echo -e "${YELLOW}⚠${NC} $*"; }
+fail() { echo -e "${RED}✗${NC} $*"; exit 1; }
+
+########################################
+# Pathing
+########################################
+
 SUBMODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PARENT_DIR="$(pwd)"
+PROJECT_DIR="$(pwd)"
 
-# 0. Validate Environment
-"${SUBMODULE_DIR}/scripts/validate-env.sh"
+[[ "$PROJECT_DIR" == "$SUBMODULE_DIR" ]] && fail "Bootstrap must be run from the parent repository."
 
-# Set defaults images
-# NOTE: find agent-dev-env images from https://github.com/rwgriffithv/agent-dev-env
-# NOTE: if changing PROD_BASE_IMAGE, DEV_BASE_IMAGE should be rebuilt off of it
+########################################
+# Parse Arguments
+########################################
+
+FORCE_OVERWRITE=false
+if [[ "${1:-}" == "--force" ]]; then
+    FORCE_OVERWRITE=true
+    info "Forcing overwrites..."
+fi
+
+########################################
+# Environment Variables
+########################################
+
+REQUIRED_VARS=("DOMAIN" "TUNNEL_TOKEN")
+
+for var in "${REQUIRED_VARS[@]}"; do
+    if [[ -z "${!var:-}" ]]; then
+        warn "Required environment variable '$var' is not set.
+Please ensure it is defined in your .env file or set manually."
+    fi
+done
+
+########################################
+# Build Default Prod Base Image
+########################################
+
+# Set default images
+IMAGE_REGISTRY="${IMAGE_REGISTRY:-local}"
 DEFAULT_PROD_BASE_IMAGE="${IMAGE_REGISTRY}/web-deploy-base:latest"
 export DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-${IMAGE_REGISTRY}/agent-dev-env:latest}"
 export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-${DEFAULT_PROD_BASE_IMAGE}}"
 
-FORCE_OVERWRITE="${FORCE_OVERWRITE:-false}"
-if [[ "${1:-}" == "--force" ]]; then FORCE_OVERWRITE=true; fi
-
-log() { printf "[web-deploy-env] %s\n" "$*"; }
-
-# 1. Build Default Prod Base Image (Idempotent with --force support)
-image_exists=$(docker images -q "${DEFAULT_PROD_BASE_IMAGE}" 2> /dev/null || true)
-
-if [[ -z "$image_exists" || "$FORCE_OVERWRITE" == true ]]; then
-    log "Building default prod base image: ${DEFAULT_PROD_BASE_IMAGE}..."
+if [[ "$FORCE_OVERWRITE" == true ]] || ! docker images -q "${DEFAULT_PROD_BASE_IMAGE}" >/dev/null 2>&1; then
+    info "Building default prod base image: ${DEFAULT_PROD_BASE_IMAGE}..."
     docker build -t "${DEFAULT_PROD_BASE_IMAGE}" -f "${SUBMODULE_DIR}/Dockerfile.base" "${SUBMODULE_DIR}"
+    success "Built base image."
 else
-    log "Default prod base image ${DEFAULT_PROD_BASE_IMAGE} already exists. Skipping build."
+    success "Default prod base image ${DEFAULT_PROD_BASE_IMAGE} already exists."
 fi
 
-# 2. Process Dockerfile Template
-mkdir -p "${PARENT_DIR}/deploy"
-DOCKERFILE_DEST="${PARENT_DIR}/deploy/Dockerfile"
+########################################
+# Process Dockerfile Template
+########################################
+
+mkdir -p "${PROJECT_DIR}/deploy"
+DOCKERFILE_DEST="${PROJECT_DIR}/deploy/Dockerfile"
 
 if [[ ! -f "$DOCKERFILE_DEST" || "$FORCE_OVERWRITE" == true ]]; then
-    log "Generating ./deploy/Dockerfile from template..."
+    info "Generating ./deploy/Dockerfile from template..."
     envsubst < "${SUBMODULE_DIR}/templates/Dockerfile" > "$DOCKERFILE_DEST"
+    success "Generated Dockerfile."
 else
-    log "Dockerfile already exists. Skipping."
+    success "Dockerfile already exists. Skipping."
 fi
 
-# 3. Sync infrastructure templates
-log "Syncing infrastructure templates..."
-ln -sf "${SUBMODULE_DIR}/templates/docker-compose.yml" "${PARENT_DIR}/"
-ln -sf "${SUBMODULE_DIR}/templates/Caddyfile" "${PARENT_DIR}/"
+########################################
+# Sync infrastructure templates
+########################################
 
-# 4. Expose utility scripts
-log "Linking utility scripts..."
+info "Syncing infrastructure templates..."
+ln -sf "${SUBMODULE_DIR}/templates/docker-compose.yml" "${PROJECT_DIR}/"
+ln -sf "${SUBMODULE_DIR}/templates/Caddyfile" "${PROJECT_DIR}/"
+success "Templates synchronized."
+
+########################################
+# Expose utility scripts
+########################################
+
+info "Linking utility scripts..."
 for script in deploy backup; do
-    ln -sf "${SUBMODULE_DIR}/scripts/${script}.sh" "${PARENT_DIR}/${script}.sh"
+    ln -sf "${SUBMODULE_DIR}/scripts/${script}.sh" "${PROJECT_DIR}/${script}.sh"
     chmod +x "${SUBMODULE_DIR}/scripts/${script}.sh"
 done
+success "Utility scripts linked."
 
-log "Bootstrap complete."
+########################################
+# Final Summary
+########################################
+
+echo -e "\n----------------------------------------"
+success "Bootstrap complete."
