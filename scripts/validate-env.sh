@@ -23,6 +23,7 @@ for var in "${REQUIRED_VARS[@]}"; do
     if [[ -z "${!var:-}" ]]; then
         echo "Error: Required environment variable '$var' is not set."
         echo "Please ensure it is defined in your .env file."
+        echo "See example file templates/env.example."
         exit 1
     fi
 done
