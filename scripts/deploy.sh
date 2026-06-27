@@ -6,12 +6,12 @@
 #
 set -euo pipefail
 
-# 1. Load environment variables
-if [ -f .env ]; then
+# Load .env file if it exists
+if [ -f ".env" ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-# 2. Build and Deploy
+# Build and Deploy
 # We use the --build flag to ensure it picks up changes in the Dockerfile
 # We specify the context as '.' and the file as 'deploy/Dockerfile'
 log() { printf "[deploy] %s\n" "$*"; }

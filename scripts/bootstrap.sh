@@ -6,21 +6,21 @@
 #
 set -euo pipefail
 
+# Load .env file if it exists
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
 SUBMODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PARENT_DIR="$(pwd)"
 
 # 0. Validate Environment
-# 0. Invoke the validator
-# Ensure the .env file is loaded if it exists
-if [ -f "${PARENT_DIR}/.env" ]; then
-    export $(grep -v '^#' "${PARENT_DIR}/.env" | xargs)
-fi
 "${SUBMODULE_DIR}/scripts/validate-env.sh"
 
 # Set defaults images
 # NOTE: find agent-dev-env images from https://github.com/rwgriffithv/agent-dev-env
 # NOTE: if changing PROD_BASE_IMAGE, DEV_BASE_IMAGE should be rebuilt off of it
-DEFAULT_PROD_BASE_IMAGE="${IMAGE_REGISTRY}/web-deploy-base:latest}"
+DEFAULT_PROD_BASE_IMAGE="${IMAGE_REGISTRY}/web-deploy-base:latest"
 export DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-${IMAGE_REGISTRY}/agent-dev-env:latest}"
 export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-${DEFAULT_PROD_BASE_IMAGE}}"
 
