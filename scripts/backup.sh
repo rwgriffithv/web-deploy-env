@@ -8,9 +8,7 @@
 set -euo pipefail
 
 # Load .env file if it exists
-if [ -f ".env" ]; then
-    export $(grep -v '^#' .env | xargs)
-fi
+set -a; [ -f .env ] && . .env; set +a
 
 ########################################
 # Configuration (overridable via env)

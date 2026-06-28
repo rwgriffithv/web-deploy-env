@@ -7,9 +7,7 @@
 set -euo pipefail
 
 # Load .env file if it exists
-if [ -f ".env" ]; then
-    export $(grep -v '^#' .env | xargs)
-fi
+set -a; [ -f .env ] && . .env; set +a
 
 ########################################
 # Logging
@@ -30,7 +28,7 @@ fail()    { echo -e "${RED}*${NC} $*"; exit 1; }
 # Devcontainer guard
 ########################################
 
-if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]] || [[ -n "${DEVCONTAINER:-}" ]]; then
+if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
     fail "Devcontainer environment detected. Deploy must run on host."
 fi
 

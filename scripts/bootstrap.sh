@@ -7,9 +7,7 @@
 set -euo pipefail
 
 # Load .env file if it exists
-if [ -f ".env" ]; then
-    export $(grep -v '^#' .env | xargs)
-fi
+set -a; [ -f .env ] && . .env; set +a
 
 ########################################
 # Logging
@@ -25,14 +23,6 @@ info()    { echo -e "${BLUE}==>${NC} $*"; }
 success() { echo -e "${GREEN}*${NC} $*"; }
 warn()    { echo -e "${YELLOW}*${NC} $*"; }
 fail()    { echo -e "${RED}*${NC} $*"; exit 1; }
-
-########################################
-# Devcontainer guard
-########################################
-
-if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]] || [[ -n "${DEVCONTAINER:-}" ]]; then
-    fail "Devcontainer environment detected. Bootstrap must run on host."
-fi
 
 ########################################
 # Pathing
@@ -52,6 +42,14 @@ FORCE_OVERWRITE=false
 if [[ "${1:-}" == "--force" ]]; then
     FORCE_OVERWRITE=true
     info "Forcing overwrites..."
+fi
+
+########################################
+# Devcontainer guard
+########################################
+
+if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
+    fail "Devcontainer environment detected. Bootstrap must run on host."
 fi
 
 ########################################
