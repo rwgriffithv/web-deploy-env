@@ -67,7 +67,8 @@ DEFAULT_PROD_BASE_IMAGE="${IMAGE_REGISTRY}/web-deploy-base:latest"
 export DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-${IMAGE_REGISTRY}/agent-dev-env:latest}"
 export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-${DEFAULT_PROD_BASE_IMAGE}}"
 
-if [[ "$FORCE_OVERWRITE" == true ]] || ! docker images -q "${DEFAULT_PROD_BASE_IMAGE}" >/dev/null 2>&1; then
+# Check if the output of docker images -q is empty
+if [[ "$FORCE_OVERWRITE" == true ]] || [[ -z "$(docker images -q "${DEFAULT_PROD_BASE_IMAGE}")" ]]; then
     info "Building default prod base image: ${DEFAULT_PROD_BASE_IMAGE}..."
     docker build -t "${DEFAULT_PROD_BASE_IMAGE}" -f "${SUBMODULE_DIR}/Dockerfile.base" "${SUBMODULE_DIR}"
     success "Built base image."
