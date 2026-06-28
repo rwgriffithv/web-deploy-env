@@ -1,4 +1,16 @@
 # templates/docker-compose.yml
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+networks:
+  frontend:
+    internal: false
+  backend:
+    internal: true
+
 services:
   # The Web Application
   webapp:
@@ -7,17 +19,27 @@ services:
       dockerfile: deploy/Dockerfile
       target: prod
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       # Keep your SQLite database persistent
       - ./data/sqlite:/app/data
     environment:
       - DATABASE_URL=file:/app/data/prod.db
       - DOMAIN=${DOMAIN}
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   # The Caddy Reverse Proxy
   caddy:
-    image: caddy:latest
+    image: caddy:2.8-alpine
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -25,18 +47,35 @@ services:
       - DOMAIN=${DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./data/certs:/etc/caddy/certs
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - webapp
+      webapp:
+        condition: service_started
+    networks:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # The Cloudflare Tunnel
   tunnel:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2024.6.1
     restart: unless-stopped
-    command: tunnel run
+    logging: *default-logging
+    command: tunnel --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      caddy:
+        condition: service_started
+    networks:
+      - frontend
 
 volumes:
   caddy_data:

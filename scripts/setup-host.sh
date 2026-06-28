@@ -27,16 +27,16 @@ RED="\033[0;31m"
 BLUE="\033[0;34m"
 NC="\033[0m"
 
-info() { echo -e "${BLUE}==>${NC} $*"; }
-success() { echo -e "${GREEN}✓${NC} $*"; }
-warn() { echo -e "${YELLOW}⚠${NC} $*"; }
-fail() { echo -e "${RED}✗${NC} $*"; exit 1; }
+info()    { echo -e "${BLUE}==>${NC} $*"; }
+success() { echo -e "${GREEN}*${NC} $*"; }
+warn()    { echo -e "${YELLOW}*${NC} $*"; }
+fail()    { echo -e "${RED}*${NC} $*"; exit 1; }
 
 ########################################
 # Devcontainer guard
 ########################################
 
-if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
+if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]] || [[ -n "${DEVCONTAINER:-}" ]]; then
     fail "Devcontainer environment detected. Host setup must run on host."
 fi
 
@@ -92,7 +92,7 @@ fi
 
 pull_image() {
     local image="$1"
-    
+
     # If not forcing, check if image exists
     if [ "$FORCE_OVERWRITE" = false ] && docker image inspect "$image" >/dev/null 2>&1; then
         success "Image $image already cached."
@@ -104,8 +104,8 @@ pull_image() {
 }
 
 info "Caching deployment infrastructure images (Force: ${FORCE_OVERWRITE})..."
-pull_image "caddy:latest"
-pull_image "cloudflare/cloudflared:latest"
+pull_image "caddy:2.8-alpine"
+pull_image "cloudflare/cloudflared:2024.6.1"
 
 ########################################
 # Final Summary

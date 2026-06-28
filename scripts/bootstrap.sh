@@ -18,18 +18,19 @@ fi
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
 BLUE="\033[0;34m"
+RED="\033[0;31m"
 NC="\033[0m"
 
-info() { echo -e "${BLUE}==>${NC} $*"; }
-success() { echo -e "${GREEN}✓${NC} $*"; }
-warn() { echo -e "${YELLOW}⚠${NC} $*"; }
-fail() { echo -e "${RED}✗${NC} $*"; exit 1; }
+info()    { echo -e "${BLUE}==>${NC} $*"; }
+success() { echo -e "${GREEN}*${NC} $*"; }
+warn()    { echo -e "${YELLOW}*${NC} $*"; }
+fail()    { echo -e "${RED}*${NC} $*"; exit 1; }
 
 ########################################
 # Devcontainer guard
 ########################################
 
-if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
+if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]] || [[ -n "${DEVCONTAINER:-}" ]]; then
     fail "Devcontainer environment detected. Bootstrap must run on host."
 fi
 
@@ -52,19 +53,6 @@ if [[ "${1:-}" == "--force" ]]; then
     FORCE_OVERWRITE=true
     info "Forcing overwrites..."
 fi
-
-########################################
-# Environment Variables
-########################################
-
-REQUIRED_VARS=("DOMAIN" "TUNNEL_TOKEN")
-
-for var in "${REQUIRED_VARS[@]}"; do
-    if [[ -z "${!var:-}" ]]; then
-        warn "Required environment variable '$var' is not set.
-Please ensure it is defined in your .env file or set manually."
-    fi
-done
 
 ########################################
 # Build Default Prod Base Image
@@ -101,6 +89,12 @@ else
 fi
 
 ########################################
+# Create certs directory
+########################################
+
+mkdir -p "${PROJECT_DIR}/data/certs"
+
+########################################
 # Sync infrastructure templates
 ########################################
 
@@ -126,3 +120,7 @@ success "Utility scripts linked."
 
 echo -e "\n----------------------------------------"
 success "Bootstrap complete."
+echo "  Next steps:"
+echo "   1. Place your Cloudflare Origin CA cert in ./data/certs/"
+echo "      (origin.pem and privkey.pem)"
+echo "   2. Run ./deploy.sh to build and start"

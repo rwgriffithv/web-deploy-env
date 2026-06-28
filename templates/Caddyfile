@@ -1,9 +1,34 @@
 # templates/Caddyfile
-# {$DOMAIN} is passed by your environment or set directly
+# {$DOMAIN} is injected by Docker Compose at runtime
 {$DOMAIN} {
-    # Reverse proxy to the internal container service
+    # TLS via Cloudflare Origin CA certificate
+    # Place origin.pem and privkey.pem in ./data/certs/ on the host.
+    # See docs/cloudflare-setup.md for instructions.
+    tls /etc/caddy/certs/origin.pem /etc/caddy/certs/privkey.pem
+
+    # Reverse proxy to the internal application container
     reverse_proxy webapp:3000
-    
-    # Optional: Enable compression for better performance
+
+    # Compression
     encode gzip
+
+    # Security headers
+    header / {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    }
+
+    # Rate limiting — 100 requests per IP per minute
+    rate_limit {
+        zone dynamic {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+    }
 }

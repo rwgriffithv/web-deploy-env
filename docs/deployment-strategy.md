@@ -18,22 +18,41 @@ Our platform follows a "Common Base → Agent-Enabled Dev → Project-Specific" 
 
 ## 3. Implementation: Templates & Variable Injection
 
-We utilize `envsubst` to process templates stored in `web-deploy-env/templates/`. This allows us to inject dynamic configuration (like `${DOMAIN}` and `${TUNNEL_TOKEN}`) at bootstrap time.
+We use two mechanisms for configuration injection:
 
-* **`deploy/Dockerfile`**: Generated from the template; uses multi-stage builds to create a lean production runtime.
-* **`docker-compose.yml`**: Standardized service orchestration (including Cloudflare Tunnel and Caddy) that relies on local `.env` files.
-* **`Caddyfile`**: Automatic SSL/TLS reverse proxy configuration.
+* **`envsubst`** — Processes the `templates/Dockerfile` at bootstrap time, injecting `${DEV_BASE_IMAGE}` and `${PROD_BASE_IMAGE}`.
+* **Runtime environment variables** — `docker-compose.yml` and `Caddyfile` receive `${DOMAIN}` and `${TUNNEL_TOKEN}` directly from the container environment at runtime. These files are symlinked, not processed by `envsubst`.
 
-## 4. Deployment Interface
+| Template | Injection Method | Variables |
+|---|---|---|
+| `deploy/Dockerfile` | `envsubst` (bootstrap) | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` |
+| `docker-compose.yml` | Runtime env | `DOMAIN`, `TUNNEL_TOKEN` |
+| `Caddyfile` | Caddy native `{$DOMAIN}` | `DOMAIN` |
+
+## 4. TLS Strategy: Cloudflare Origin CA
+
+Caddy is configured with a **Cloudflare Origin CA certificate** rather than auto-provisioning via Let's Encrypt. This is required because Cloudflare Tunnel proxies traffic at the edge — Let's Encrypt's HTTP-01 challenge cannot reach the origin server through the tunnel.
+
+**Traffic flow:**
+
+```
+User → Cloudflare Edge (TLS) → Cloudflare Tunnel → cloudflared container
+  → Caddy (TLS via Origin CA) → webapp (plain HTTP on :3000)
+```
+
+Cloudflare SSL/TLS mode must be set to **Full (Strict)**.
+
+See `docs/cloudflare-setup.md` for instructions on generating the Origin CA certificate.
+
+## 5. Deployment Interface
 
 The `web-deploy-env` submodule acts as a toolkit for your project:
 
-* **`scripts/validate-env.sh`**: The pre-flight gatekeeper. It verifies system dependencies and ensures all required environment variables (e.g., `DOMAIN`, `TUNNEL_TOKEN`) are set before execution.
-* **`scripts/bootstrap.sh`**: The master orchestrator. It invokes the validator, generates infrastructure files, and creates symlinks for configuration and utility scripts.
+* **`scripts/bootstrap.sh`**: The master orchestrator. It generates infrastructure files and creates symlinks for configuration and utility scripts.
 * **`scripts/deploy.sh`**: Symlinked to the project root. Handles the standardized multi-stage build and container orchestration.
-* **`scripts/backup.sh`**: Symlinked to the project root. Handles disaster recovery by snapshotting the SQLite data volume.
+* **`scripts/backup.sh`**: Symlinked to the project root. Handles disaster recovery by snapshotting the SQLite data volume, with automatic rotation and integrity verification.
 
-## 5. Maintenance Workflow
+## 6. Maintenance Workflow
 
 To keep environments synchronized:
 
