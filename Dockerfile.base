@@ -9,9 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
 && rm -rf /var/lib/apt/lists/*
 
-# Create standard developer user
-RUN groupadd -g 1001 developer && \
-    useradd -m -u 1001 -g developer -s /bin/bash developer
+# Remove pre-existing node user (uid 1000) to avoid uid conflict with host
+RUN userdel node 2>/dev/null; groupdel node 2>/dev/null; true
+
+# Create standard developer user at uid 1000 (matches common host uid)
+RUN groupadd -g 1000 developer && \
+    useradd -m -u 1000 -g developer -s /bin/bash developer
 
 WORKDIR /app
 USER developer

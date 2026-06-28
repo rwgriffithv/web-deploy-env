@@ -31,6 +31,7 @@ fail() { echo -e "${RED}✗${NC} $*"; exit 1; }
 
 SUBMODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="$(pwd)"
+SUBMODULE_REL="${SUBMODULE_DIR#"${PROJECT_DIR}/"}"
 
 [[ "$PROJECT_DIR" == "$SUBMODULE_DIR" ]] && fail "Bootstrap must be run from the parent repository."
 
@@ -96,8 +97,8 @@ fi
 ########################################
 
 info "Syncing infrastructure templates..."
-ln -sf "${SUBMODULE_DIR}/templates/docker-compose.yml" "${PROJECT_DIR}/"
-ln -sf "${SUBMODULE_DIR}/templates/Caddyfile" "${PROJECT_DIR}/"
+ln -sf "${SUBMODULE_REL}/templates/docker-compose.yml" "${PROJECT_DIR}/docker-compose.yml"
+ln -sf "${SUBMODULE_REL}/templates/Caddyfile" "${PROJECT_DIR}/Caddyfile"
 success "Templates synchronized."
 
 ########################################
@@ -106,7 +107,7 @@ success "Templates synchronized."
 
 info "Linking utility scripts..."
 for script in deploy backup; do
-    ln -sf "${SUBMODULE_DIR}/scripts/${script}.sh" "${PROJECT_DIR}/${script}.sh"
+    ln -sf "${SUBMODULE_REL}/scripts/${script}.sh" "${PROJECT_DIR}/${script}.sh"
     chmod +x "${SUBMODULE_DIR}/scripts/${script}.sh"
 done
 success "Utility scripts linked."
