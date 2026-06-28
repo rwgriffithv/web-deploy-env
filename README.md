@@ -73,6 +73,15 @@ Setup host dependencies and bootstrap the parent repository:
 
 The setup and bootstrap processes are idempotent.
 
+> **Important:** These scripts run on the **host machine**, not inside a devcontainer.
+> They install system packages, pull Docker images, build base images, and symlink
+> infrastructure templates — all operations that belong on the host. If you attempt
+> to run them inside a devcontainer, they will abort with a clear error message.
+>
+> Container initialization is handled by the project's own build and runtime
+> configuration (e.g., `Dockerfile`, `docker-compose.yml`, devcontainer
+> `postCreateCommand`).
+
 ---
 
 # Maintenance Workflow

@@ -26,6 +26,14 @@ warn() { echo -e "${YELLOW}⚠${NC} $*"; }
 fail() { echo -e "${RED}✗${NC} $*"; exit 1; }
 
 ########################################
+# Devcontainer guard
+########################################
+
+if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
+    fail "Devcontainer environment detected. Bootstrap must run on host."
+fi
+
+########################################
 # Pathing
 ########################################
 
