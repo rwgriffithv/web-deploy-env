@@ -59,7 +59,7 @@ CERTS_DIR="./data/certs"
 if [[ ! -f "${CERTS_DIR}/origin.pem" ]] || [[ ! -f "${CERTS_DIR}/privkey.pem" ]]; then
     fail "TLS certificates not found in ${CERTS_DIR}/.
        Place origin.pem and privkey.pem in that directory.
-       See docs/cloudflare-setup.md for instructions."
+       See web-deploy-env/docs/cloudflare-setup.md for instructions."
 fi
 success "TLS certificates found."
 

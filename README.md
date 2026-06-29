@@ -33,25 +33,66 @@ parent-project/
 
 ### Service Architecture
 
+Three Docker services connected over two isolated networks:
+
 ```
-                  Cloudflare Edge
-                        |
-                  Cloudflare Tunnel
-                        |
-                    cloudflared
-                        |
-                    ┌───┘
-                 Caddy (TLS, reverse proxy, security headers)
-                        |
-                    webapp (Next.js on :3000)
-                        |
-                    SQLite (/app/data)
+                    Cloudflare Edge
+                          |
+                    Cloudflare Tunnel
+                          |
+                    ┌─────┘
+              [frontend network]
+                    |
+         Caddy (TLS, security headers, rate limiting)
+                    |
+              [backend network] (internal, no internet)
+                    |
+         webapp (application server on :3000)
+                    |
+               SQLite (/app/data)
 ```
 
-Three Docker services connected over isolated networks:
-- **tunnel** — outbound-only connection to Cloudflare edge (frontend network only)
-- **caddy** — TLS termination, rate limiting, security headers (frontend + backend networks)
-- **webapp** — application server, isolated on backend network
+| Service | Image | Networks | Purpose |
+|---------|-------|----------|---------|
+| **tunnel** | `cloudflare/cloudflared:2024.6.1` | frontend only | Outbound-only connection to Cloudflare edge |
+| **caddy** | `caddy:2.8-alpine` | frontend + backend | TLS termination, reverse proxy, security headers, rate limiting |
+| **webapp** | Build from `deploy/Dockerfile` | backend only | Application server (Next.js on :3000), isolated from internet |
+
+The **frontend** network has external access (for tunnel outbound). The **backend** network is `internal: true` — the webapp has no internet connectivity, only caddy can reach it.
+
+### Caddy Configuration
+
+The template `Caddyfile` (at project root, symlinked from `templates/Caddyfile`) configures:
+
+| Setting | Value |
+|---------|-------|
+| TLS | Cloudflare Origin CA certs from `data/certs/` |
+| Reverse proxy | `webapp:3000` |
+| Compression | `gzip` |
+| HSTS | `max-age=31536000; includeSubDomains; preload` |
+| X-Content-Type-Options | `nosniff` |
+| X-Frame-Options | `DENY` |
+| Referrer-Policy | `strict-origin-when-cross-origin` |
+| Permissions-Policy | `camera=(), microphone=(), geolocation=()` |
+| CSP | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'` |
+| Rate limiting | 100 requests per IP per minute |
+
+### Health Checks
+
+Each service has a Docker health check configured in `docker-compose.yml`:
+
+| Service | Test | Interval | Retries | Start Period |
+|---------|------|----------|---------|-------------|
+| **webapp** | `GET /api/health` → expect 200 | 30s | 3 | 15s |
+| **caddy** | `wget --spider http://localhost:80/healthz` | 30s | 3 | 10s |
+
+Check health status at any time:
+
+```bash
+docker compose ps                    # See overall status
+docker compose inspect --format='{{json .State.Health}}' webapp  # JSON health details
+docker compose logs webapp           # Review application logs
+```
 
 ---
 
@@ -98,14 +139,34 @@ See [docs/cloudflare-setup.md](docs/cloudflare-setup.md) for detailed instructio
 
 ### 3. Setup and Bootstrap
 
-Setup host dependencies and bootstrap the parent repository:
+Run these two scripts in order **on the host machine** (not inside a devcontainer):
 
 ```bash
 ./web-deploy-env/scripts/setup-host.sh
 ./web-deploy-env/scripts/bootstrap.sh
 ```
 
-The setup and bootstrap processes are idempotent.
+Both scripts are idempotent — running them multiple times is safe.
+
+#### `setup-host.sh`
+
+| Step | Action |
+|------|--------|
+| 1 | **OS check** — Requires Debian or Ubuntu |
+| 2 | **Install `gettext`** — Provides `envsubst` for template processing |
+| 3 | **Verify Docker** — Checks `docker` is installed; exits if missing |
+| 4 | **Cache images** — Pre-pulls `caddy:2.8-alpine` and `cloudflare/cloudflared:2024.6.1` for faster deploys |
+
+#### `bootstrap.sh`
+
+| Step | Action |
+|------|--------|
+| 1 | **Path validation** — Ensures script is run from the parent repo, not the submodule |
+| 2 | **Build default base image** — Builds `web-deploy-base:latest` from `Dockerfile.base` (skips if already exists, unless `--force`) |
+| 3 | **Generate `deploy/Dockerfile`** — Runs `envsubst` on `templates/Dockerfile` to inject `DEV_BASE_IMAGE` and `PROD_BASE_IMAGE` |
+| 4 | **Create `data/` directories** — Ensures `data/certs/` exists for TLS certificates |
+| 5 | **Symlink templates** — Links `docker-compose.yml`, `Caddyfile` to project root |
+| 6 | **Link utility scripts** — Symlinks `deploy.sh` and `backup.sh` to project root |
 
 > **Important:** These scripts run on the **host machine**, not inside a devcontainer.
 > They install system packages, pull Docker images, build base images, and symlink
@@ -132,6 +193,58 @@ See [docs/cloudflare-setup.md#5-install-the-certificate-on-your-server](docs/clo
 
 ```bash
 ./deploy.sh
+```
+
+---
+
+## Deployment Checklist
+
+Before deploying, verify these items:
+
+1. **DOMAIN** and **TUNNEL_TOKEN** are set in `.env`
+2. **TLS certificates** exist at `data/certs/origin.pem` and `data/certs/privkey.pem`
+3. **Ports 80 and 443** are not in use on the host
+4. **Docker Compose** is available (`docker compose version`)
+5. **Base images** are built (run `bootstrap.sh` if not)
+6. **Cloudflare tunnel** is created and pointing to `caddy:80` (HTTP)
+7. **Cloudflare SSL/TLS** mode is set to **Full (Strict)**
+8. **DNS** resolves the domain to Cloudflare (nameservers or proxied DNS)
+9. **Database** exists or will be initialized on first start
+10. **Backup** of existing data has been created (`./backup.sh`)
+
+---
+
+## Operation
+
+Day-to-day commands for managing the deployment:
+
+```bash
+# View all service statuses
+docker compose ps
+
+# Follow all logs
+docker compose logs -f
+
+# Follow logs for a specific service
+docker compose logs -f caddy
+
+# Check health status
+docker compose ps --format 'table {{.Name}}\t{{.Status}}\t{{.Health}}'
+
+# Execute a command inside a running container
+docker compose exec webapp ls /app/data
+
+# Restart a single service
+docker compose restart caddy
+
+# Rebuild and restart a single service
+docker compose build --no-cache webapp && docker compose up -d webapp
+
+# Stop all services
+docker compose down
+
+# Stop all services and remove volumes (destructive)
+docker compose down -v
 ```
 
 ---
@@ -165,6 +278,7 @@ The toolkit exposes standard commands to the project root:
 
 * **Deploy:** `./deploy.sh` (Builds the app and starts the containers)
 * **Backup:** `./backup.sh` (Snapshots your data volume to `./data/backups/`)
+* **Restore:** See [docs/backup-restore.md](docs/backup-restore.md) (decompress backup, stop services, restore data, redeploy)
 
 ---
 
@@ -183,4 +297,5 @@ This separation ensures that when you learn a "better way" to deploy (e.g., addi
 
 * **`docs/deployment-strategy.md`**: Architectural lineage and template injection strategy.
 * **`docs/cloudflare-setup.md`**: Step-by-step Cloudflare configuration guide.
-* **`PLAN.md`**: Architecture assessment and remediation plan.
+* **`docs/deploy-script.md`**: Detailed walkthrough of the `deploy.sh` script stages, exit codes, and troubleshooting.
+* **`docs/backup-restore.md`**: Creating backups, listing snapshots, verifying integrity, and restoring from a backup.

@@ -24,10 +24,18 @@ We use two mechanisms for configuration injection:
 * **Runtime environment variables** — `docker-compose.yml` and `Caddyfile` receive `${DOMAIN}` and `${TUNNEL_TOKEN}` directly from the container environment at runtime. These files are symlinked, not processed by `envsubst`.
 
 | Template | Injection Method | Variables |
-|---|---|---|
-| `deploy/Dockerfile` | `envsubst` (bootstrap) | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` |
+|---|---|---|---|
+| `deploy/Dockerfile` | `envsubst` (bootstrap) | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` (both default to `${IMAGE_REGISTRY}/...`) |
 | `docker-compose.yml` | Runtime env | `DOMAIN`, `TUNNEL_TOKEN` |
 | `Caddyfile` | Caddy native `{$DOMAIN}` | `DOMAIN` |
+
+The `IMAGE_REGISTRY` variable controls the registry prefix for all base images. Set it in `.env`:
+
+```text
+IMAGE_REGISTRY=ghcr.io/myorg
+```
+
+Defaults to `local` (for locally-built images). When set, both `DEV_BASE_IMAGE` and `PROD_BASE_IMAGE` resolve under that registry unless individually overridden.
 
 ## 4. TLS Strategy: Cloudflare Origin CA
 
