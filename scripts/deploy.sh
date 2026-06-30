@@ -104,7 +104,7 @@ if [[ ! -f "$DB_FILE" ]]; then
         success "Database initialized at ${DB_FILE}."
     else
         warn "Could not auto-initialize database (tsx not available?)."
-        warn "Run manually: DATABASE_URL=file:${DB_FILE} npm run db:init"
+        warn "Make sure db:init is defined in your package.json for auto initialization."
     fi
 else
     success "Production database found at ${DB_FILE}."

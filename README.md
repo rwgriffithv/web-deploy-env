@@ -208,7 +208,7 @@ Before deploying, verify these items:
 4. **Base images** are built (run `bootstrap.sh` if not)
 5. **Cloudflare tunnel** is created and pointing to `caddy:80` (HTTP)
 6. **DNS** resolves the domain to Cloudflare (nameservers or proxied DNS)
-7. **Database** exists or will be initialized on first start
+7. **`db:init` script** defined in `package.json` — `deploy.sh` calls `npm run db:init` with `DATABASE_URL` set to auto-create the production database on first start
 8. **Backup** of existing data has been created (`./backup.sh`)
 
 ---
