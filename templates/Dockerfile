@@ -1,19 +1,18 @@
-# 1. Start from the shared dev environment (Inherits system libs & Node)
-# NOTE: DEV_BASE_IMAGE should be built upon PROD_BASE_IMAGE
+ARG IMAGE_REGISTRY=local
+ARG DEV_BASE_IMAGE=${IMAGE_REGISTRY}/agent-dev-env:latest
+ARG PROD_BASE_IMAGE=${IMAGE_REGISTRY}/web-deploy-base:latest
+
 FROM ${DEV_BASE_IMAGE} AS dev-base
 WORKDIR /app
 COPY . .
+USER root
 RUN npm install && npm run build
 
-# 2. Extract to a lean production image
-# We start fresh from the base to ensure zero bloat
 FROM ${PROD_BASE_IMAGE} AS prod
 WORKDIR /app
-# Copy only production artifacts from dev-base
 COPY --from=dev-base /app/node_modules ./node_modules
 COPY --from=dev-base /app/.next ./.next
 COPY --from=dev-base /app/public ./public
 COPY --from=dev-base /app/package.json ./package.json
 
-# Production runtime
 CMD ["node", "node_modules/.bin/next", "start"]

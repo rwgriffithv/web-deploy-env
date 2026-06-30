@@ -10,19 +10,28 @@ The result is a consistent, secure, and easily maintainable deployment stack tha
 
 ## Architecture
 
-`web-deploy-env` follows a "Standardized Infrastructure" pattern. A typical project using this submodule looks like this:
+### Caddy's Role — Security Gateway, Not TLS Terminator
+
+Caddy sits between the Cloudflare Tunnel and the application as a **security gateway**. It does not terminate TLS — Cloudflare handles that at the edge. Instead, Caddy provides defense-in-depth:
+
+- **Network isolation** — The webapp is locked on the `backend` network (no internet access). Caddy bridges `frontend` and `backend`, so the tunnel can only reach the webapp through Caddy.
+- **Security headers** — HSTS, CSP, X-Frame-Options, and others are injected at the proxy layer. Done here, they work regardless of what the application framework does.
+- **Future flexibility** — If you ever bypass the tunnel (local dev, direct server access, different CDN), Caddy can serve TLS with a real certificate in two lines — no app changes needed.
+
+A typical project using this submodule looks like this:
 
 ```text
 parent-project/
-├── deploy/                 # Auto-generated build artifacts
+├── .dockerignore           # Symlinked from submodule (reduces build context)
+├── Dockerfile              # Symlinked from submodule (multi-stage build)
 ├── data/                   # Persistent storage
 │   ├── sqlite/             # SQLite database volume
-│   ├── backups/            # Automated backup snapshots
-│   └── certs/              # Cloudflare Origin CA certificates
+│   └── backups/            # Automated backup snapshots
 ├── .env                    # Secrets and configuration
 ├── docker-compose.yml      # Symlinked from submodule
 ├── Caddyfile               # Symlinked from submodule
 ├── deploy.sh               # Symlinked utility
+├── down.sh                 # Symlinked utility
 ├── backup.sh               # Symlinked utility
 │
 └── web-deploy-env/         # Git submodule
@@ -43,7 +52,7 @@ Three Docker services connected over two isolated networks:
                     ┌─────┘
               [frontend network]
                     |
-         Caddy (TLS, security headers, rate limiting)
+          Caddy (security gateway — reverse proxy, security headers)
                     |
               [backend network] (internal, no internet)
                     |
@@ -55,8 +64,8 @@ Three Docker services connected over two isolated networks:
 | Service | Image | Networks | Purpose |
 |---------|-------|----------|---------|
 | **tunnel** | `cloudflare/cloudflared:2024.6.1` | frontend only | Outbound-only connection to Cloudflare edge |
-| **caddy** | `caddy:2.8-alpine` | frontend + backend | TLS termination, reverse proxy, security headers, rate limiting |
-| **webapp** | Build from `deploy/Dockerfile` | backend only | Application server (Next.js on :3000), isolated from internet |
+| **caddy** | `caddy:2.8-alpine` | frontend + backend | Security gateway — reverse proxy, security headers, network isolation |
+| **webapp** | Build from `Dockerfile` | backend only | Application server (Next.js on :3000), isolated from internet |
 
 The **frontend** network has external access (for tunnel outbound). The **backend** network is `internal: true` — the webapp has no internet connectivity, only caddy can reach it.
 
@@ -66,7 +75,7 @@ The template `Caddyfile` (at project root, symlinked from `templates/Caddyfile`)
 
 | Setting | Value |
 |---------|-------|
-| TLS | Cloudflare Origin CA certs from `data/certs/` |
+| TLS | None — Cloudflare terminates TLS at the edge. Traffic arrives at Caddy over HTTP through the tunnel. |
 | Reverse proxy | `webapp:3000` |
 | Compression | `gzip` |
 | HSTS | `max-age=31536000; includeSubDomains; preload` |
@@ -75,7 +84,6 @@ The template `Caddyfile` (at project root, symlinked from `templates/Caddyfile`)
 | Referrer-Policy | `strict-origin-when-cross-origin` |
 | Permissions-Policy | `camera=(), microphone=(), geolocation=()` |
 | CSP | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'` |
-| Rate limiting | 100 requests per IP per minute |
 
 ### Health Checks
 
@@ -101,7 +109,7 @@ docker compose logs webapp           # Review application logs
 | Component | Purpose |
 | --- | --- |
 | **Configuration** | Setup the host with dependencies and bootstrap project configs. |
-| **Templates** | Standardized `Caddyfile`, `docker-compose.yml`, and `Dockerfile`. |
+| **Templates** | Standardized `Caddyfile`, `docker-compose.yml`, `Dockerfile`, and `.dockerignore`. |
 | **Deployment** | Multi-stage build and container orchestration logic. |
 | **Backup** | Automated snapshots with rotation and integrity verification. |
 
@@ -132,8 +140,11 @@ TUNNEL_TOKEN=your_cloudflare_tunnel_token
 Before deploying, you need to configure Cloudflare:
 
 1. [Create a tunnel](docs/cloudflare-setup.md#1-create-a-tunnel) and copy the tunnel token.
-2. [Generate an Origin CA certificate](docs/cloudflare-setup.md#4-generate-an-origin-ca-certificate).
-3. [Set SSL/TLS mode to Full (Strict)](docs/cloudflare-setup.md#3-set-ssltls-mode-to-full-strict).
+2. Point the tunnel's public hostname to `http://caddy:80`.
+
+That's it. **Origin CA certificates are not required** with Cloudflare Tunnel — the tunnel encrypts traffic end-to-end. Cloudflare handles TLS termination at the edge; Caddy receives plain HTTP from the tunnel.
+
+If you ever need direct origin access (bypassing the tunnel), see [docs/cloudflare-setup.md](docs/cloudflare-setup.md) for optional Origin CA setup.
 
 See [docs/cloudflare-setup.md](docs/cloudflare-setup.md) for detailed instructions.
 
@@ -153,9 +164,8 @@ Both scripts are idempotent — running them multiple times is safe.
 | Step | Action |
 |------|--------|
 | 1 | **OS check** — Requires Debian or Ubuntu |
-| 2 | **Install `gettext`** — Provides `envsubst` for template processing |
-| 3 | **Verify Docker** — Checks `docker` is installed; exits if missing |
-| 4 | **Cache images** — Pre-pulls `caddy:2.8-alpine` and `cloudflare/cloudflared:2024.6.1` for faster deploys |
+| 2 | **Verify Docker** — Checks `docker` is installed; exits if missing |
+| 3 | **Cache images** — Pre-pulls `caddy:2.8-alpine` and `cloudflare/cloudflared:2024.6.1` for faster deploys |
 
 #### `bootstrap.sh`
 
@@ -163,10 +173,9 @@ Both scripts are idempotent — running them multiple times is safe.
 |------|--------|
 | 1 | **Path validation** — Ensures script is run from the parent repo, not the submodule |
 | 2 | **Build default base image** — Builds `web-deploy-base:latest` from `Dockerfile.base` (skips if already exists, unless `--force`) |
-| 3 | **Generate `deploy/Dockerfile`** — Runs `envsubst` on `templates/Dockerfile` to inject `DEV_BASE_IMAGE` and `PROD_BASE_IMAGE` |
-| 4 | **Create `data/` directories** — Ensures `data/certs/` exists for TLS certificates |
-| 5 | **Symlink templates** — Links `docker-compose.yml`, `Caddyfile` to project root |
-| 6 | **Link utility scripts** — Symlinks `deploy.sh` and `backup.sh` to project root |
+| 3 | **Create `data/` directories** — Ensures directories for SQLite and backups exist |
+| 4 | **Symlink infrastructure templates** — Links `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `Caddyfile` to project root |
+| 5 | **Link utility scripts** — Symlinks `deploy.sh`, `down.sh`, and `backup.sh` to project root |
 
 > **Important:** These scripts run on the **host machine**, not inside a devcontainer.
 > They install system packages, pull Docker images, build base images, and symlink
@@ -177,17 +186,9 @@ Both scripts are idempotent — running them multiple times is safe.
 > configuration (e.g., `Dockerfile`, `docker-compose.yml`, devcontainer
 > `postCreateCommand`).
 
-### 4. Install Origin CA Certificate
+### 4. Optional: Origin CA Certificate (for direct origin access)
 
-Place your Cloudflare Origin CA certificate and private key in `./data/certs/`:
-
-```bash
-mkdir -p ./data/certs
-# Copy origin.pem and privkey.pem into ./data/certs/
-chmod 600 ./data/certs/privkey.pem
-```
-
-See [docs/cloudflare-setup.md#5-install-the-certificate-on-your-server](docs/cloudflare-setup.md#5-install-the-certificate-on-your-server).
+If you want direct server access without the tunnel (e.g., for staging, or as a fallback), you can install Cloudflare Origin CA certificates. See [docs/cloudflare-setup.md](docs/cloudflare-setup.md).
 
 ### 5. Deploy
 
@@ -202,15 +203,13 @@ See [docs/cloudflare-setup.md#5-install-the-certificate-on-your-server](docs/clo
 Before deploying, verify these items:
 
 1. **DOMAIN** and **TUNNEL_TOKEN** are set in `.env`
-2. **TLS certificates** exist at `data/certs/origin.pem` and `data/certs/privkey.pem`
-3. **Ports 80 and 443** are not in use on the host
-4. **Docker Compose** is available (`docker compose version`)
-5. **Base images** are built (run `bootstrap.sh` if not)
-6. **Cloudflare tunnel** is created and pointing to `caddy:80` (HTTP)
-7. **Cloudflare SSL/TLS** mode is set to **Full (Strict)**
-8. **DNS** resolves the domain to Cloudflare (nameservers or proxied DNS)
-9. **Database** exists or will be initialized on first start
-10. **Backup** of existing data has been created (`./backup.sh`)
+2. **Ports 80** is not in use on the host
+3. **Docker Compose** is available (`docker compose version`)
+4. **Base images** are built (run `bootstrap.sh` if not)
+5. **Cloudflare tunnel** is created and pointing to `caddy:80` (HTTP)
+6. **DNS** resolves the domain to Cloudflare (nameservers or proxied DNS)
+7. **Database** exists or will be initialized on first start
+8. **Backup** of existing data has been created (`./backup.sh`)
 
 ---
 
@@ -277,6 +276,7 @@ Infrastructure images (`caddy`, `cloudflare/cloudflared`) are pinned to specific
 The toolkit exposes standard commands to the project root:
 
 * **Deploy:** `./deploy.sh` (Builds the app and starts the containers)
+* **Down:** `./down.sh` (Stops the containers)
 * **Backup:** `./backup.sh` (Snapshots your data volume to `./data/backups/`)
 * **Restore:** See [docs/backup-restore.md](docs/backup-restore.md) (decompress backup, stop services, restore data, redeploy)
 

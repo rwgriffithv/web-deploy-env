@@ -1,18 +1,16 @@
 # templates/Caddyfile
-# {$DOMAIN} is injected by Docker Compose at runtime
-{$DOMAIN} {
-    # TLS via Cloudflare Origin CA certificate
-    # Place origin.pem and privkey.pem in ./data/certs/ on the host.
-    # See docs/cloudflare-setup.md for instructions.
-    tls /etc/caddy/certs/origin.pem /etc/caddy/certs/privkey.pem
-
+# {$DOMAIN} is injected by Docker Compose at runtime.
+# Cloudflare handles TLS termination at the edge. Caddy serves
+# HTTP-only behind the Cloudflare Tunnel.
+http://{$DOMAIN} {
     # Reverse proxy to the internal application container
     reverse_proxy webapp:3000
 
     # Compression
     encode gzip
 
-    # Security headers
+    # Security headers — HSTS is safe here because Cloudflare
+    # serves the HTTPS response; Caddy only sees HTTP from the tunnel.
     header / {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
@@ -21,14 +19,5 @@
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
         Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
-    }
-
-    # Rate limiting — 100 requests per IP per minute
-    rate_limit {
-        zone dynamic {
-            key {remote_host}
-            events 100
-            window 1m
-        }
     }
 }

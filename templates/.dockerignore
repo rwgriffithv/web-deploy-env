@@ -1,0 +1,39 @@
+# Version control
+.git/
+.gitignore
+.gitmodules
+
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+
+# Environment and secrets
+.env
+.env.*
+
+# Runtime data
+data/
+
+# Documentation and tests
+*.md
+docs/
+e2e/
+test-results/
+
+# Development environment
+.devcontainer/
+.devc*/
+.opencode/
+agent-dev-env/
+web-deploy-env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+*.log
+__pycache__/
+*.pyc

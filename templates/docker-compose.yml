@@ -16,7 +16,7 @@ services:
   webapp:
     build:
       context: .
-      dockerfile: deploy/Dockerfile
+      dockerfile: Dockerfile
       target: prod
     restart: unless-stopped
     logging: *default-logging
@@ -42,14 +42,10 @@ services:
     logging: *default-logging
     ports:
       - "80:80"
-      - "443:443"
     environment:
       - DOMAIN=${DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
-      - ./data/certs:/etc/caddy/certs
-      - caddy_data:/data
-      - caddy_config:/config
     depends_on:
       webapp:
         condition: service_started
@@ -77,6 +73,4 @@ services:
     networks:
       - frontend
 
-volumes:
-  caddy_data:
-  caddy_config:
+volumes: {}

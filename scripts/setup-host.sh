@@ -57,24 +57,6 @@ source /etc/os-release
 [[ "$ID" =~ ^(debian|ubuntu)$ ]] || fail "This script currently supports Debian and Ubuntu."
 
 ########################################
-# Install apt packages if missing
-########################################
-
-install_if_missing() {
-    local pkg="$1"
-
-    if [ "$FORCE_OVERWRITE" = false ] && dpkg -s "$pkg" >/dev/null 2>&1; then
-        success "$pkg already installed."
-    else
-        info "Installing $pkg..."
-        sudo apt-get install -y "$pkg"
-        changed=true
-    fi
-}
-
-install_if_missing gettext
-
-########################################
 # Docker
 ########################################
 

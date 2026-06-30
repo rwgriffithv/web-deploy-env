@@ -2,7 +2,9 @@
 #
 # scripts/deploy.sh
 #
-# Builds and deploys the web app deployment container.
+# Builds (or skips build with --skip-build) and deploys the web app.
+#   ./deploy.sh          — full build + deploy
+#   ./deploy.sh --skip-build — quick restart using existing images
 #
 set -euo pipefail
 
@@ -33,6 +35,18 @@ if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
 fi
 
 ########################################
+# Parse Arguments
+########################################
+
+SKIP_BUILD=false
+for arg in "$@"; do
+    case "$arg" in
+        --skip-build) SKIP_BUILD=true ;;
+        *) warn "Unknown argument: $arg" ;;
+    esac
+done
+
+########################################
 # Environment Variables
 ########################################
 
@@ -52,18 +66,6 @@ if [[ "$missing_vars" == true ]]; then
 fi
 
 ########################################
-# Certificates
-########################################
-
-CERTS_DIR="./data/certs"
-if [[ ! -f "${CERTS_DIR}/origin.pem" ]] || [[ ! -f "${CERTS_DIR}/privkey.pem" ]]; then
-    fail "TLS certificates not found in ${CERTS_DIR}/.
-       Place origin.pem and privkey.pem in that directory.
-       See web-deploy-env/docs/cloudflare-setup.md for instructions."
-fi
-success "TLS certificates found."
-
-########################################
 # Compose Command Detection
 ########################################
 
@@ -78,12 +80,39 @@ fi
 info "Using: ${COMPOSE_CMD}"
 
 ########################################
-# Build and Deploy
+# Build
 ########################################
 
-info "Building images for ${DOMAIN}..."
-$COMPOSE_CMD build --pull --build-arg BUILDKIT_INLINE_CACHE=1
-success "Build complete."
+if [[ "$SKIP_BUILD" == true ]]; then
+    info "Skipping build (--skip-build). Using existing images."
+else
+    info "Building images for ${DOMAIN}..."
+    $COMPOSE_CMD build --build-arg BUILDKIT_INLINE_CACHE=1
+    success "Build complete."
+fi
+
+########################################
+# Database initialization
+########################################
+
+DB_FILE="./data/sqlite/prod.db"
+mkdir -p "$(dirname "$DB_FILE")"
+
+if [[ ! -f "$DB_FILE" ]]; then
+    info "No production database found. Initializing..."
+    if DATABASE_URL="file:${DB_FILE}" npm run db:init 2>/dev/null; then
+        success "Database initialized at ${DB_FILE}."
+    else
+        warn "Could not auto-initialize database (tsx not available?)."
+        warn "Run manually: DATABASE_URL=file:${DB_FILE} npm run db:init"
+    fi
+else
+    success "Production database found at ${DB_FILE}."
+fi
+
+########################################
+# Deploy
+########################################
 
 info "Starting services..."
 $COMPOSE_CMD up -d

@@ -56,13 +56,9 @@ fi
 # Build Default Prod Base Image
 ########################################
 
-# Set default images
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-local}"
 DEFAULT_PROD_BASE_IMAGE="${IMAGE_REGISTRY}/web-deploy-base:latest"
-export DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-${IMAGE_REGISTRY}/agent-dev-env:latest}"
-export PROD_BASE_IMAGE="${PROD_BASE_IMAGE:-${DEFAULT_PROD_BASE_IMAGE}}"
 
-# Check if the output of docker images -q is empty
 if [[ "$FORCE_OVERWRITE" == true ]] || [[ -z "$(docker images -q "${DEFAULT_PROD_BASE_IMAGE}")" ]]; then
     info "Building default prod base image: ${DEFAULT_PROD_BASE_IMAGE}..."
     docker build -t "${DEFAULT_PROD_BASE_IMAGE}" -f "${SUBMODULE_DIR}/Dockerfile.base" "${SUBMODULE_DIR}"
@@ -72,33 +68,20 @@ else
 fi
 
 ########################################
-# Process Dockerfile Template
+# Create data directories
 ########################################
 
-mkdir -p "${PROJECT_DIR}/deploy"
-DOCKERFILE_DEST="${PROJECT_DIR}/deploy/Dockerfile"
-
-if [[ ! -f "$DOCKERFILE_DEST" || "$FORCE_OVERWRITE" == true ]]; then
-    info "Generating ./deploy/Dockerfile from template..."
-    envsubst < "${SUBMODULE_DIR}/templates/Dockerfile" > "$DOCKERFILE_DEST"
-    success "Generated Dockerfile."
-else
-    success "Dockerfile already exists. Skipping."
-fi
-
-########################################
-# Create certs directory
-########################################
-
-mkdir -p "${PROJECT_DIR}/data/certs"
+mkdir -p "${PROJECT_DIR}/data/sqlite" "${PROJECT_DIR}/data/backups"
 
 ########################################
 # Sync infrastructure templates
 ########################################
 
 info "Syncing infrastructure templates..."
+ln -sf "${SUBMODULE_REL}/templates/Dockerfile" "${PROJECT_DIR}/Dockerfile"
 ln -sf "${SUBMODULE_REL}/templates/docker-compose.yml" "${PROJECT_DIR}/docker-compose.yml"
 ln -sf "${SUBMODULE_REL}/templates/Caddyfile" "${PROJECT_DIR}/Caddyfile"
+ln -sf "${SUBMODULE_REL}/templates/.dockerignore" "${PROJECT_DIR}/.dockerignore"
 success "Templates synchronized."
 
 ########################################
@@ -106,7 +89,7 @@ success "Templates synchronized."
 ########################################
 
 info "Linking utility scripts..."
-for script in deploy backup; do
+for script in deploy backup down; do
     ln -sf "${SUBMODULE_REL}/scripts/${script}.sh" "${PROJECT_DIR}/${script}.sh"
     chmod +x "${SUBMODULE_DIR}/scripts/${script}.sh"
 done
@@ -119,6 +102,7 @@ success "Utility scripts linked."
 echo -e "\n----------------------------------------"
 success "Bootstrap complete."
 echo "  Next steps:"
-echo "   1. Place your Cloudflare Origin CA cert in ./data/certs/"
-echo "      (origin.pem and privkey.pem)"
+echo "   1. Create a Cloudflare tunnel and set DOMAIN + TUNNEL_TOKEN in .env"
 echo "   2. Run ./deploy.sh to build and start"
+echo "      Use ./deploy.sh --skip-build to restart with existing images"
+echo "   3. Run ./down.sh to stop all services"
