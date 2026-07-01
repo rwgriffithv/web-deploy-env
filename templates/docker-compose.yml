@@ -18,6 +18,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: prod
+      args:
+      - DEV_BASE_IMAGE=${DEV_BASE_IMAGE:-local/web-deploy-base:latest}
+      - PROD_BASE_IMAGE=${PROD_BASE_IMAGE:-local/web-deploy-base:latest}
     restart: unless-stopped
     logging: *default-logging
     volumes:

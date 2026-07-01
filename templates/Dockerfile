@@ -1,5 +1,5 @@
 ARG IMAGE_REGISTRY=local
-ARG DEV_BASE_IMAGE=${IMAGE_REGISTRY}/agent-dev-env:latest
+ARG DEV_BASE_IMAGE=${IMAGE_REGISTRY}/web-deploy-base:latest
 ARG PROD_BASE_IMAGE=${IMAGE_REGISTRY}/web-deploy-base:latest
 
 FROM ${DEV_BASE_IMAGE} AS dev-base

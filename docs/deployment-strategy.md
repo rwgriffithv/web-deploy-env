@@ -12,9 +12,11 @@ Our platform follows a "Common Base → Agent-Enabled Dev → Project-Specific" 
 
 ## 2. The Lineage Hierarchy
 
-1. **`web-deploy-base`**: The foundational layer (OS, Node.js, SQLite, system-level libs).
-2. **`agent-dev-env`**: Inherits from `web-deploy-base`. Adds LLM tools, debuggers, and VS Code devcontainer standards.
-3. **`project-repo`**: Inherits from `agent-dev-env`. Adds project-specific dependencies.
+1. **`web-deploy-base`**: The foundational layer (OS, Node.js, system-level libs).
+2. **`project-repo` (build stage `dev-base`)**: Inherits from `web-deploy-base`. Installs project dependencies and runs the build. Does **not** include agent/dev tooling — those are reserved for the separate `agent-dev-env` image.
+3. **`project-repo` (prod stage)**: Copies only the build artifacts from `dev-base` into a fresh `web-deploy-base` layer for the smallest possible production image and framework for extensibility.
+
+> **Optional override:** Set `DEV_BASE_IMAGE` in `.env` to use a custom build base for including extra dependencies at build time. Set `PROD_BASE_IMAGE` in `.env` to use a custom production image instead of the image provided by this toolkit.
 
 ## 3. Implementation: Templates & Variable Injection
 
@@ -24,19 +26,28 @@ We use Docker `ARG` defaults for build-time configuration and runtime environmen
 * **Runtime environment variables** — `docker-compose.yml` and `Caddyfile` receive `${DOMAIN}` and `${TUNNEL_TOKEN}` directly from the container environment at runtime. These files are symlinked, not processed.
 
 | Template | Configuration Method | Variables |
-|---|---|---|
-| `Dockerfile` | Docker `ARG` defaults in template | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` (both default to `${IMAGE_REGISTRY}/...`) |
+|---|---|---|---|
+| `Dockerfile` | Docker `ARG` defaults in template | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` (both default to `${IMAGE_REGISTRY}/web-deploy-base:latest`) |
 | `.dockerignore` | Static exclusion list | — |
-| `docker-compose.yml` | Runtime env | `DOMAIN`, `TUNNEL_TOKEN` |
+| `docker-compose.yml` | Build args (from `.env`) + Runtime env | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` (build), `DOMAIN`, `TUNNEL_TOKEN` (runtime) |
 | `Caddyfile` | Caddy native `{$DOMAIN}` | `DOMAIN` |
 
-The `IMAGE_REGISTRY` ARG controls the registry prefix for all base images. Override at build time:
+The `IMAGE_REGISTRY` ARG controls the registry prefix for all base images. Override at build time or in `.env`:
 
 ```bash
 docker compose build --build-arg IMAGE_REGISTRY=ghcr.io/myorg
 ```
 
 Defaults to `local` (for locally-built images). When set, both `DEV_BASE_IMAGE` and `PROD_BASE_IMAGE` resolve under that registry.
+
+Individual base images can be overridden independently via `.env`:
+
+```env
+# .env — override the build base for the dev stage
+DEV_BASE_IMAGE=local/agent-dev-env:latest
+```
+
+Because `docker-compose.yml` declares these as build args referencing `${VAR:-default}`, Docker Compose resolves them from `.env` automatically — no script changes needed.
 
 ## 4. TLS Strategy: Cloudflare at the Edge, Caddy as Gateway
 
