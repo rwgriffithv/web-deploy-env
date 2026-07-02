@@ -9,10 +9,9 @@ The `deploy.sh` script orchestrates the multi-stage Docker build and service sta
 | 1 | Env Validation | 39–52 | Checks `DOMAIN` and `TUNNEL_TOKEN` are set |
 | 2 | Compose Detection | 70–78 | Picks `docker compose` (plugin) or `docker-compose` (standalone) |
 | 3 | Build | 84–86 | Runs `docker compose build` with `BUILDKIT_INLINE_CACHE=1` (skipped with `--skip-build`) |
-| 4 | Database Init | 95–108 | Creates `data/sqlite/prod.db` if missing |
-| 5 | Start Services | 111–113 | Runs `docker compose up -d` |
-| 6 | Health Check | 119–132 | Sleeps 5s, then checks each service shows `Up` status |
-| 7 | Summary | 138–144 | Prints success or instructions for troubleshooting |
+| 4 | Start Services | 98–100 | Runs `docker compose up -d` |
+| 5 | Health Check | 106–119 | Sleeps 5s, then checks each service shows `Up` status |
+| 6 | Summary | 125–131 | Prints success or instructions for troubleshooting |
 
 ## Options
 
@@ -31,24 +30,13 @@ Prefer `docker compose` (v2 plugin). Falls back to `docker-compose` (v1 standalo
 ### 3. Build
 Runs `docker compose build --build-arg BUILDKIT_INLINE_CACHE=1`. The `BUILDKIT_INLINE_CACHE=1` arg embeds cache metadata into the image for faster subsequent builds. Pass `--skip-build` to reuse existing images (useful after config changes or crashes).
 
-### 4. Database Init
-If `data/sqlite/prod.db` does not exist, the script runs `DATABASE_URL="file:${DB_FILE}" npm run db:init` to auto-initialize.
-
-The parent project **must** define a `db:init` script in `package.json` for this to work:
-
-```json
-"db:init": "tsx scripts/db-init.ts"
-```
-
-The toolkit delegates the *how* of database initialization entirely to the parent — it only provides the `DATABASE_URL` pointing to the production database path and calls the npm script. If the script is missing or fails, a warning is printed instructing the user to define `db:init` in `package.json`.
-
-### 5. Start Services
+### 4. Start Services
 Runs `docker compose up -d`. Containers start in dependency order: `webapp` → `caddy` → `tunnel`.
 
-### 6. Health Check
+### 5. Health Check
 After a 5-second settling period, the script enumerates all services and checks each for an `Up` status. Non-running services are flagged as warnings.
 
-### 7. Summary
+### 6. Summary
 - **All services Up** → "Deployment complete."
 - **Some services not running** → "Deployment finished but some services are not running." with a hint to run `docker compose logs <service>`.
 

@@ -16,9 +16,7 @@ If you're using Cloudflare Tunnel (the default), you only need to create a tunne
 3. Add `DOMAIN` and `TUNNEL_TOKEN` to your `.env` file.
 4. Run `./deploy.sh`.
 
-**Origin CA certificates and SSL/TLS mode changes are not needed.** The tunnel encrypts traffic end-to-end. Cloudflare handles TLS at the edge; Caddy receives HTTP through the tunnel.
-
-The sections below cover both the tunnel setup and the optional Origin CA setup for direct origin access.
+No SSL/TLS configuration changes are needed — the tunnel encrypts traffic end-to-end. Cloudflare handles TLS at the edge; Caddy receives HTTP through the tunnel.
 
 ---
 
@@ -45,43 +43,7 @@ After creating the tunnel, configure its public hostname:
 
 **Important:** The tunnel connects to Caddy on port **80** (HTTP). Caddy does not terminate TLS — it acts as a security gateway (reverse proxy, security headers, network isolation). Cloudflare handles TLS at the edge.
 
-## 3. SSL/TLS Mode
-
-With Cloudflare Tunnel, the SSL/TLS mode setting in the Cloudflare dashboard is **not relevant** — the tunnel provides its own encryption between Cloudflare and your server. You can leave it at the default setting.
-
-If you configure direct origin access (bypassing the tunnel), set SSL/TLS to **Full (Strict)** and see section 4 below.
-
-## 4. Optional: Origin CA Certificate (for Direct Origin Access)
-
-If you need direct server access without the tunnel (e.g., staging environment, CDN fallback), you can generate an Origin CA certificate:
-
-1. In the Cloudflare dashboard, go to **SSL/TLS** → **Origin Server**.
-2. Click **Create Certificate**.
-3. Leave the default **Generate private key and CSR with Cloudflare** selected.
-4. Set the hostnames to include your domain (e.g., `app.yourdomain.com` and `*.yourdomain.com`).
-5. Choose a validity period (14 days to 15 years).
-6. Click **Create**.
-7. **Copy both the origin certificate and private key** — this is your only chance to save the private key.
-8. Place the files in `./data/certs/`:
-   ```bash
-   mkdir -p ./data/certs
-   cat > ./data/certs/origin.pem << 'EOF'
-   -----BEGIN CERTIFICATE-----
-   ... (paste origin certificate here)
-   -----END CERTIFICATE-----
-   EOF
-   cat > ./data/certs/privkey.pem << 'EOF'
-   -----BEGIN RSA PRIVATE KEY-----
-   ... (paste private key here)
-   -----END RSA PRIVATE KEY-----
-   EOF
-   chmod 600 ./data/certs/privkey.pem
-   ```
-9. Update the `Caddyfile` to add the `tls` directive and use `{$DOMAIN}` instead of `http://{$DOMAIN}`.
-10. Expose port 443 in `docker-compose.yml`.
-11. Set Cloudflare SSL/TLS to **Full (Strict)**.
-
-## 5. Configure Your .env File
+## 3. Configure Your .env File
 
 Your project's `.env` file needs these variables:
 
@@ -90,7 +52,7 @@ DOMAIN=app.yourdomain.com
 TUNNEL_TOKEN=your_cloudflare_tunnel_token_here
 ```
 
-## 6. Deploy
+## 4. Deploy
 
 ```bash
 ./deploy.sh

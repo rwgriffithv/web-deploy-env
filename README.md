@@ -16,7 +16,7 @@ Caddy sits between the Cloudflare Tunnel and the application as a **security gat
 
 - **Network isolation** — The webapp is locked on the `backend` network (no internet access). Caddy bridges `frontend` and `backend`, so the tunnel can only reach the webapp through Caddy.
 - **Security headers** — HSTS, CSP, X-Frame-Options, and others are injected at the proxy layer. Done here, they work regardless of what the application framework does.
-- **Future flexibility** — If you ever bypass the tunnel (local dev, direct server access, different CDN), Caddy can serve TLS with a real certificate in two lines — no app changes needed.
+- **Future flexibility** — The same setup works with any reverse proxy or CDN without application changes.
 
 A typical project using this submodule looks like this:
 
@@ -142,10 +142,6 @@ Before deploying, you need to configure Cloudflare:
 1. [Create a tunnel](docs/cloudflare-setup.md#1-create-a-tunnel) and copy the tunnel token.
 2. Point the tunnel's public hostname to `http://caddy:80`.
 
-That's it. **Origin CA certificates are not required** with Cloudflare Tunnel — the tunnel encrypts traffic end-to-end. Cloudflare handles TLS termination at the edge; Caddy receives plain HTTP from the tunnel.
-
-If you ever need direct origin access (bypassing the tunnel), see [docs/cloudflare-setup.md](docs/cloudflare-setup.md) for optional Origin CA setup.
-
 See [docs/cloudflare-setup.md](docs/cloudflare-setup.md) for detailed instructions.
 
 ### 3. Setup and Bootstrap
@@ -186,11 +182,7 @@ Both scripts are idempotent — running them multiple times is safe.
 > configuration (e.g., `Dockerfile`, `docker-compose.yml`, devcontainer
 > `postCreateCommand`).
 
-### 4. Optional: Origin CA Certificate (for direct origin access)
-
-If you want direct server access without the tunnel (e.g., for staging, or as a fallback), you can install Cloudflare Origin CA certificates. See [docs/cloudflare-setup.md](docs/cloudflare-setup.md).
-
-### 5. Deploy
+### 4. Deploy
 
 ```bash
 ./deploy.sh
@@ -208,8 +200,7 @@ Before deploying, verify these items:
 4. **Base images** are built (run `bootstrap.sh` if not)
 5. **Cloudflare tunnel** is created and pointing to `caddy:80` (HTTP)
 6. **DNS** resolves the domain to Cloudflare (nameservers or proxied DNS)
-7. **`db:init` script** defined in `package.json` — `deploy.sh` calls `npm run db:init` with `DATABASE_URL` set to auto-create the production database on first start
-8. **Backup** of existing data has been created (`./backup.sh`)
+7. **Backup** of existing data has been created (`./backup.sh`)
 
 ---
 

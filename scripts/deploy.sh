@@ -27,14 +27,6 @@ warn()    { echo -e "${YELLOW}*${NC} $*"; }
 fail()    { echo -e "${RED}*${NC} $*"; exit 1; }
 
 ########################################
-# Devcontainer guard
-########################################
-
-if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
-    fail "Devcontainer environment detected. Deploy must run on host."
-fi
-
-########################################
 # Parse Arguments
 ########################################
 
@@ -66,6 +58,14 @@ if [[ "$missing_vars" == true ]]; then
 fi
 
 ########################################
+# Devcontainer guard
+########################################
+
+if [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]; then
+    fail "Devcontainer environment detected. Deploy must run on host."
+fi
+
+########################################
 # Compose Command Detection
 ########################################
 
@@ -89,25 +89,6 @@ else
     info "Building images for ${DOMAIN}..."
     $COMPOSE_CMD build --build-arg BUILDKIT_INLINE_CACHE=1
     success "Build complete."
-fi
-
-########################################
-# Database initialization
-########################################
-
-DB_FILE="./data/sqlite/prod.db"
-mkdir -p "$(dirname "$DB_FILE")"
-
-if [[ ! -f "$DB_FILE" ]]; then
-    info "No production database found. Initializing..."
-    if DATABASE_URL="file:${DB_FILE}" npm run db:init 2>/dev/null; then
-        success "Database initialized at ${DB_FILE}."
-    else
-        warn "Could not auto-initialize database (tsx not available?)."
-        warn "Make sure db:init is defined in your package.json for auto initialization."
-    fi
-else
-    success "Production database found at ${DB_FILE}."
 fi
 
 ########################################

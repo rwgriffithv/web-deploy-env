@@ -49,11 +49,9 @@ DEV_BASE_IMAGE=local/agent-dev-env:latest
 
 Because `docker-compose.yml` declares these as build args referencing `${VAR:-default}`, Docker Compose resolves them from `.env` automatically — no script changes needed.
 
-## 4. TLS Strategy: Cloudflare at the Edge, Caddy as Gateway
+## 4. Network Architecture
 
-### With Cloudflare Tunnel (default)
-
-The Cloudflare Tunnel provides an encrypted channel from the Cloudflare edge to your server. Caddy does **not** terminate TLS — it receives plain HTTP from the tunnel on port 80.
+The Cloudflare Tunnel provides an encrypted channel from the Cloudflare edge to your server. Caddy receives plain HTTP from the tunnel on port 80.
 
 **Traffic flow:**
 
@@ -61,23 +59,6 @@ The Cloudflare Tunnel provides an encrypted channel from the Cloudflare edge to 
 User → Cloudflare Edge (TLS) → Cloudflare Tunnel (encrypted)
   → cloudflared → Caddy (HTTP on :80) → webapp (HTTP on :3000)
 ```
-
-- Cloudflare terminates TLS at the edge.
-- The tunnel encrypts traffic between Cloudflare and the server.
-- **Origin CA certificates are not needed** — the tunnel itself provides origin encryption.
-- Cloudflare SSL/TLS mode should be set to **Flexible** (tunnel handles encryption) or left at default. Full (Strict) is not applicable because there is no direct origin TLS handshake.
-
-### Without Tunnel (direct origin access)
-
-For scenarios where the tunnel is bypassed (local testing, alternative CDN, direct server access), Caddy can serve TLS directly. To enable this:
-
-1. Generate a Cloudflare Origin CA certificate (see `docs/cloudflare-setup.md`).
-2. Place `origin.pem` and `privkey.pem` in `./data/certs/`.
-3. Update the `Caddyfile` to add the `tls` directive and use `{$DOMAIN}` instead of `http://{$DOMAIN}`.
-4. Expose port 443 in `docker-compose.yml`.
-5. Set Cloudflare SSL/TLS to **Full (Strict)**.
-
-This is a supported fallback, not the default. The standard deployment uses the tunnel path above.
 
 ## 5. Deployment Interface
 
