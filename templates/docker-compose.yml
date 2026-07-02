@@ -40,7 +40,7 @@ services:
 
   # The Caddy Reverse Proxy
   caddy:
-    image: caddy:2.8-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     logging: *default-logging
     ports:
@@ -64,7 +64,7 @@ services:
 
   # The Cloudflare Tunnel
   tunnel:
-    image: cloudflare/cloudflared:2024.6.1
+    image: cloudflare/cloudflared:2026.6.1
     restart: unless-stopped
     logging: *default-logging
     command: tunnel --no-autoupdate run

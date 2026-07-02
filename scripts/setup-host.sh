@@ -84,8 +84,8 @@ pull_image() {
 }
 
 info "Caching deployment infrastructure images (Force: ${FORCE_OVERWRITE})..."
-pull_image "caddy:2.8-alpine"
-pull_image "cloudflare/cloudflared:2024.6.1"
+pull_image "caddy:2.11.4-alpine"
+pull_image "cloudflare/cloudflared:2026.6.1"
 
 ########################################
 # Final Summary

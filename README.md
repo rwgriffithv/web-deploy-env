@@ -63,8 +63,8 @@ Three Docker services connected over two isolated networks:
 
 | Service | Image | Networks | Purpose |
 |---------|-------|----------|---------|
-| **tunnel** | `cloudflare/cloudflared:2024.6.1` | frontend only | Outbound-only connection to Cloudflare edge |
-| **caddy** | `caddy:2.8-alpine` | frontend + backend | Security gateway — reverse proxy, security headers, network isolation |
+| **tunnel** | `cloudflare/cloudflared:2026.6.1` | frontend only | Outbound-only connection to Cloudflare edge |
+| **caddy** | `caddy:2.11.4-alpine` | frontend + backend | Security gateway — reverse proxy, security headers, network isolation |
 | **webapp** | Build from `Dockerfile` | backend only | Application server (Next.js on :3000), isolated from internet |
 
 The **frontend** network has external access (for tunnel outbound). The **backend** network is `internal: true` — the webapp has no internet connectivity, only caddy can reach it.
@@ -165,7 +165,7 @@ Both scripts are idempotent — running them multiple times is safe.
 |------|--------|
 | 1 | **OS check** — Requires Debian or Ubuntu |
 | 2 | **Verify Docker** — Checks `docker` is installed; exits if missing |
-| 3 | **Cache images** — Pre-pulls `caddy:2.8-alpine` and `cloudflare/cloudflared:2024.6.1` for faster deploys |
+| 3 | **Cache images** — Pre-pulls `caddy:2.11.4-alpine` and `cloudflare/cloudflared:2026.6.1` for faster deploys |
 
 #### `bootstrap.sh`
 
