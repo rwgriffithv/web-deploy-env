@@ -237,6 +237,26 @@ docker compose down
 docker compose down -v
 ```
 
+### Running Commands Inside the Container
+
+The production image includes Node.js and your application's installed dependencies. Use `docker compose run` to execute one-off commands or scripts inside the container, with full access to the mounted database volume:
+
+```bash
+# Run an ad-hoc Node.js command
+docker compose run --rm webapp node -e "
+  const db = require('better-sqlite3')('/app/data/prod.db');
+  const row = db.prepare('SELECT COUNT(*) as count FROM users').get();
+  console.log('User count:', row.count);
+"
+
+# Run a local script by mounting it at runtime (no need to rebuild the image)
+docker compose run --rm \
+  -v "$(pwd)/path/to/script.ts:/tmp/script.ts" \
+  webapp npx tsx /tmp/script.ts
+```
+
+`docker compose run` creates a temporary container linked to the same networks and volumes as the service. The `--rm` flag cleans it up automatically. The working directory is `/app`, and `node_modules` is available at `/app/node_modules`.
+
 ---
 
 ## Maintenance Workflow
