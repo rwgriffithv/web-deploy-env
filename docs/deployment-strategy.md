@@ -23,14 +23,16 @@ Our platform follows a "Common Base → Agent-Enabled Dev → Project-Specific" 
 We use Docker `ARG` defaults for build-time configuration and runtime environment variables for configuration:
 
 * **Dockerfile ARGs** — The `templates/Dockerfile` is a static file symlinked to the project root `Dockerfile`. It declares `DEV_BASE_IMAGE` and `PROD_BASE_IMAGE` as `ARG`s with defaults, avoiding any template processing step.
-* **Runtime environment variables** — `docker-compose.yml` and `Caddyfile` receive `${DOMAIN}` and `${TUNNEL_TOKEN}` directly from the container environment at runtime. These files are symlinked, not processed.
+* **Runtime environment variables** — The `webapp` service uses `env_file: .env` to forward ALL variables from the project's `.env` file into the container automatically. Infrastructure paths like `DATABASE_URL` and `MEDIA_DIR` are set as `environment:` defaults in docker-compose.yml for production safety. `DOMAIN` and `TUNNEL_TOKEN` are used directly in the compose file for interpolation (e.g., `${DOMAIN}` in `Caddyfile`).
 
 | Template | Configuration Method | Variables |
-|---|---|---|---|
+|---|---|---|
 | `Dockerfile` | Docker `ARG` defaults in template | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` (both default to `${IMAGE_REGISTRY}/web-deploy-base:latest`) |
 | `.dockerignore` | Static exclusion list | — |
-| `docker-compose.yml` | Build args (from `.env`) + Runtime env | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` (build), `DOMAIN`, `TUNNEL_TOKEN` (runtime) |
+| `docker-compose.yml` | Build args (from `.env`) + `env_file` + `environment:` defaults | `DEV_BASE_IMAGE`, `PROD_BASE_IMAGE` (build); `DATABASE_URL`, `MEDIA_DIR` (infrastructure defaults); all `.env` vars forwarded via `env_file` |
 | `Caddyfile` | Caddy native `{$DOMAIN}` | `DOMAIN` |
+
+> **Why `env_file` instead of listing vars in `environment:`:** Application-level configuration (admin credentials, session secrets, app name) varies per project. Listing each var individually in `docker-compose.yml` would require updating the template every time a project adds a new env var. With `env_file: .env`, the template never needs to change — just add the var to `.env` and it's available in the container. Infrastructure paths (`DATABASE_URL`, `MEDIA_DIR`) are kept as explicit `environment:` entries because they must always resolve to correct paths regardless of `.env` content.
 
 The `IMAGE_REGISTRY` ARG controls the registry prefix for all base images. Override at build time or in `.env`:
 

@@ -24,10 +24,11 @@ A typical project using this submodule looks like this:
 parent-project/
 ├── .dockerignore           # Symlinked from submodule (reduces build context)
 ├── Dockerfile              # Symlinked from submodule (multi-stage build)
-├── data/                   # Persistent storage
+├── data/                   # Docker volume: ./data:/app/data
 │   ├── sqlite/             # SQLite database volume
-│   └── backups/            # Automated backup snapshots
-├── .env                    # Secrets and configuration
+│   └── media/              # Uploaded media files
+├── backups/                # Backup snapshots (outside Docker volume)
+├── .env                    # Forwarded to containers via env_file — add any var here
 ├── docker-compose.yml      # Symlinked from submodule
 ├── Caddyfile               # Symlinked from submodule
 ├── deploy.sh               # Symlinked utility
@@ -56,9 +57,9 @@ Three Docker services connected over two isolated networks:
                     |
               [backend network] (internal, no internet)
                     |
-         webapp (application server on :3000)
+          webapp (application server on :3000)
                     |
-               SQLite (/app/data)
+               SQLite (/app/data/sqlite/prod.db)
 ```
 
 | Service | Image | Networks | Purpose |
@@ -128,12 +129,18 @@ git submodule update --init --recursive
 
 ### 1. Configuration
 
-Create/update the `.env` file in your project root with the following requirements:
+Create/update the `.env` file in your project root. The `docker-compose.yml` uses `env_file: .env` to forward all variables to the `webapp` container automatically — no need to list them individually.
+
+Required variables (used directly by Compose for interpolation):
 
 ```text
 DOMAIN=yourdomain.com
 TUNNEL_TOKEN=your_cloudflare_tunnel_token
 ```
+
+Application variables can be added and forwarded to the container via `env_file` without touching `docker-compose.yml`.
+
+> **How it works:** `docker-compose.yml` declares `env_file: .env` for the `webapp` service. Docker Compose reads `.env` and sets every variable in the container's environment. Infrastructure paths like `DATABASE_URL` and `MEDIA_DIR` are kept as `environment:` defaults in the compose file — they can be overridden from `.env` if needed, but sensible production defaults are always available.
 
 ### 2. Cloudflare Setup
 
@@ -169,7 +176,7 @@ Both scripts are idempotent — running them multiple times is safe.
 |------|--------|
 | 1 | **Path validation** — Ensures script is run from the parent repo, not the submodule |
 | 2 | **Build default base image** — Builds `web-deploy-base:latest` from `Dockerfile.base` (skips if already exists, unless `--force`) |
-| 3 | **Create `data/` directories** — Ensures directories for SQLite and backups exist |
+| 3 | **Create `data/` directories** — Ensures directories for SQLite and media exist |
 | 4 | **Symlink infrastructure templates** — Links `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `Caddyfile` to project root |
 | 5 | **Link utility scripts** — Symlinks `deploy.sh`, `down.sh`, and `backup.sh` to project root |
 
@@ -244,7 +251,7 @@ The production image includes Node.js and your application's installed dependenc
 ```bash
 # Run an ad-hoc Node.js command
 docker compose run --rm webapp node -e "
-  const db = require('better-sqlite3')('/app/data/prod.db');
+  const db = require('better-sqlite3')('/app/data/sqlite/prod.db');
   const row = db.prepare('SELECT COUNT(*) as count FROM users').get();
   console.log('User count:', row.count);
 "
@@ -288,7 +295,7 @@ The toolkit exposes standard commands to the project root:
 
 * **Deploy:** `./deploy.sh` (Builds the app and starts the containers)
 * **Down:** `./down.sh` (Stops the containers)
-* **Backup:** `./backup.sh` (Snapshots your data volume to `./data/backups/`)
+* **Backup:** `./backup.sh` (Snapshots your data volume to `./backups/`)
 * **Restore:** See [docs/backup-restore.md](docs/backup-restore.md) (decompress backup, stop services, restore data, redeploy)
 
 ---

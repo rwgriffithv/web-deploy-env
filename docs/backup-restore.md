@@ -6,14 +6,18 @@
 ./backup.sh
 ```
 
-This creates a compressed tarball of the SQLite data directory at `./data/backups/` with a timestamped filename:
+This creates a compressed tarball of the `./data/` directory at `./backups/` with a timestamped filename:
 
 ```
-data/backups/
+backups/
 ├── db_backup_20260629_120000.tar.gz
 ├── db_backup_20260629_120000.tar.gz.sha256
 └── ...
 ```
+
+Backups are stored **outside** the Docker volume (`./backups/` instead of `./data/backups/`). This means they survive `docker compose down -v` and are safe from disk failure scenarios that only affect the data directory.
+
+The archive preserves the `data/` directory structure — it contains `data/sqlite/`, `data/media/`, and any other `data/` subdirectories.
 
 Each backup is accompanied by a SHA-256 checksum for integrity verification. Backups older than 7 days are automatically rotated (deleted).
 
@@ -23,8 +27,8 @@ The script respects these environment variables (can be set in `.env`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BACKUP_DIR` | `./data/backups` | Where backup files are stored |
-| `SOURCE_DIR` | `./data/sqlite` | The data directory to back up |
+| `BACKUP_DIR` | `./backups` | Where backup files are stored (outside Docker volume) |
+| `DATA_DIR` | `./data` | The data directory to back up |
 | `BACKUP_ROTATION_KEEP` | `7` | Days of backups to retain |
 | `BACKUP_DRY_RUN` | `false` | Set to `true` to preview without creating |
 
@@ -38,10 +42,10 @@ Shows what would be backed up and rotated without writing any files.
 
 ## Listing Backups
 
-Backup files are stored as plain `.tar.gz` files in `./data/backups/`. List them with:
+Backup files are stored as plain `.tar.gz` files in `./backups/`. List them with:
 
 ```bash
-ls -lh ./data/backups/
+ls -lh ./backups/
 ```
 
 Each backup pair consists of:
@@ -51,7 +55,7 @@ Each backup pair consists of:
 ## Verifying Backup Integrity
 
 ```bash
-sha256sum -c ./data/backups/db_backup_20260629_120000.tar.gz.sha256
+sha256sum -c ./backups/db_backup_20260629_120000.tar.gz.sha256
 ```
 
 This recomputes the SHA-256 of the backup file and compares it against the stored checksum.
@@ -67,14 +71,14 @@ This recomputes the SHA-256 of the backup file and compares it against the store
 2. **Extract the backup to a temporary location**:
 
    ```bash
-   mkdir -p /tmp/db-restore
-   tar -xzf ./data/backups/db_backup_20260629_120000.tar.gz -C /tmp/db-restore
+   mkdir -p /tmp/data-restore
+   tar -xzf ./backups/db_backup_20260629_120000.tar.gz -C /tmp/data-restore
    ```
 
 3. **Replace the current data directory**:
 
    ```bash
-   cp -a /tmp/db-restore/. ./data/sqlite/
+   cp -a /tmp/data-restore/data/. ./data/
    ```
 
 4. **Start the services**:

@@ -14,8 +14,8 @@ set -a; [ -f .env ] && . .env; set +a
 # Configuration (overridable via env)
 ########################################
 
-BACKUP_DIR="${BACKUP_DIR:-./data/backups}"
-SOURCE_DIR="${SOURCE_DIR:-./data/sqlite}"
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
+DATA_DIR="${DATA_DIR:-./data}"
 ROTATION_KEEP="${BACKUP_ROTATION_KEEP:-7}"
 DRY_RUN="${BACKUP_DRY_RUN:-false}"
 
@@ -31,8 +31,8 @@ fail()  { printf "[backup] ERROR: %s\n" "$*"; exit 1; }
 # Pre-flight checks
 ########################################
 
-if [[ ! -d "$SOURCE_DIR" ]]; then
-    fail "Source directory '$SOURCE_DIR' not found. Nothing to back up."
+if [[ ! -d "$DATA_DIR" ]]; then
+    fail "Data directory '$DATA_DIR' not found. Nothing to back up."
 fi
 
 mkdir -p "$BACKUP_DIR"
@@ -46,7 +46,7 @@ BACKUP_FILE="${BACKUP_DIR}/db_backup_${TIMESTAMP}.tar.gz"
 
 if [[ "$DRY_RUN" == "true" ]]; then
     log "[DRY-RUN] Would create: $BACKUP_FILE"
-    log "[DRY-RUN] From: $SOURCE_DIR"
+    log "[DRY-RUN] From: $DATA_DIR → $BACKUP_DIR"
     log "[DRY-RUN] Would rotate backups older than $ROTATION_KEEP days"
     exit 0
 fi
@@ -55,8 +55,11 @@ fi
 # Create backup
 ########################################
 
-log "Backing up SQLite database..."
-tar -czf "$BACKUP_FILE" -C "$SOURCE_DIR" .
+log "Backing up $DATA_DIR → $BACKUP_FILE..."
+
+tar -czf "$BACKUP_FILE" \
+  -C "$(dirname "$DATA_DIR")" \
+  "$(basename "$DATA_DIR")"
 
 ########################################
 # Integrity check

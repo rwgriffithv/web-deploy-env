@@ -10,9 +10,8 @@ RUN npm install && npm run build
 
 FROM ${PROD_BASE_IMAGE} AS prod
 WORKDIR /app
-COPY --from=dev-base /app/node_modules ./node_modules
-COPY --from=dev-base /app/.next ./.next
+COPY --from=dev-base /app/.next/standalone ./
+COPY --from=dev-base /app/.next/static ./.next/static
 COPY --from=dev-base /app/public ./public
-COPY --from=dev-base /app/package.json ./package.json
 
-CMD ["node", "node_modules/.bin/next", "start"]
+CMD ["node", "server.js"]

@@ -24,6 +24,8 @@ The `deploy.sh` script orchestrates the multi-stage Docker build and service sta
 ### 1. Env Validation
 Required variables: `DOMAIN`, `TUNNEL_TOKEN`. If either is missing, the script exits with a warning listing which variables are unset. Define them in `.env` at the project root.
 
+> The `.env` file is also forwarded to the `webapp` container via `env_file: .env` in `docker-compose.yml`. Application-level vars like `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `SESSION_SECRET` do not need to be listed in docker-compose.yml — they're available in the container automatically as long as they're in `.env`.
+
 ### 2. Compose Detection
 Prefer `docker compose` (v2 plugin). Falls back to `docker-compose` (v1 standalone). If neither is found, exits with an install prompt.
 

@@ -91,6 +91,9 @@ else
     success "Build complete."
 fi
 
+mkdir -p ./data/sqlite ./data/media
+info "Ensured data/sqlite and data/media directories exist."
+
 ########################################
 # Deploy
 ########################################

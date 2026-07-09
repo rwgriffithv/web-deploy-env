@@ -52,6 +52,8 @@ DOMAIN=app.yourdomain.com
 TUNNEL_TOKEN=your_cloudflare_tunnel_token_here
 ```
 
+Application-level variables (admin credentials, session secret, etc.) are also read from `.env` — see the [Configuration section](../README.md#1-configuration) in the main README. The `webapp` container uses `env_file: .env`, so any variable you add to `.env` is automatically available at runtime.
+
 ## 4. Deploy
 
 ```bash

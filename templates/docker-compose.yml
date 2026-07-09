@@ -24,19 +24,15 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
-      # Keep your SQLite database persistent
-      - ./data/sqlite:/app/data
+      # Keep your data persistent (SQLite database + uploaded media)
+      - ./data:/app/data
+    env_file: .env
     environment:
-      - DATABASE_URL=file:/app/data/prod.db
-      - DOMAIN=${DOMAIN}
+      # Infrastructure paths — keep explicit for production safety
+      - DATABASE_URL=file:/app/data/sqlite/prod.db
+      - MEDIA_DIR=/app/data/media
     networks:
       - backend
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
 
   # The Caddy Reverse Proxy
   caddy:

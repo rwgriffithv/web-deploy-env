@@ -71,7 +71,7 @@ fi
 # Create data directories
 ########################################
 
-mkdir -p "${PROJECT_DIR}/data/sqlite" "${PROJECT_DIR}/data/backups"
+mkdir -p "${PROJECT_DIR}/data/sqlite" "${PROJECT_DIR}/data/media"
 
 ########################################
 # Sync infrastructure templates
