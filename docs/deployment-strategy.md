@@ -58,9 +58,14 @@ The Cloudflare Tunnel provides an encrypted channel from the Cloudflare edge to 
 **Traffic flow:**
 
 ```
-User → Cloudflare Edge (TLS) → Cloudflare Tunnel (encrypted)
-  → cloudflared → Caddy (HTTP on :80) → webapp (HTTP on :3000)
+User (203.0.113.42)
+  → Cloudflare Edge (TLS termination, sets CF-Connecting-IP: 203.0.113.42)
+  → Cloudflare Tunnel (encrypted)
+  → cloudflared → Caddy (HTTP on :80)
+  → webapp (HTTP on :3000, sees CF-Connecting-IP: 203.0.113.42)
 ```
+
+Caddy's `header_up` directives preserve Cloudflare's `CF-Connecting-IP` and `X-Forwarded-For` headers. Without them, the webapp would see the Docker-internal tunnel IP (`172.x.x.x`) instead of the real client IP. See the [README](../README.md#client-ip-forwarding) for details on accessing the client IP in application code.
 
 ## 5. Deployment Interface
 

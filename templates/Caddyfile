@@ -3,8 +3,14 @@
 # Cloudflare handles TLS termination at the edge. Caddy serves
 # HTTP-only behind the Cloudflare Tunnel.
 http://{$DOMAIN} {
-    # Reverse proxy to the internal application container
-    reverse_proxy webapp:3000
+    # Reverse proxy to the internal application container.
+    # Pass through Cloudflare's CF-Connecting-IP (real client IP) and
+    # X-Forwarded-For so the app can identify the true client, not the
+    # Docker-internal tunnel IP.
+    reverse_proxy webapp:3000 {
+        header_up CF-Connecting-IP {http.request.header.CF-Connecting-IP}
+        header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+    }
 
     # Compression
     encode gzip

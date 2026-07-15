@@ -78,6 +78,7 @@ The template `Caddyfile` (at project root, symlinked from `templates/Caddyfile`)
 |---------|-------|
 | TLS | None — Cloudflare terminates TLS at the edge. Traffic arrives at Caddy over HTTP through the tunnel. |
 | Reverse proxy | `webapp:3000` |
+| Client IP forwarding | Passes `CF-Connecting-IP` and `X-Forwarded-For` through to the app (see below) |
 | Compression | `gzip` |
 | HSTS | `max-age=31536000; includeSubDomains; preload` |
 | X-Content-Type-Options | `nosniff` |
@@ -85,6 +86,46 @@ The template `Caddyfile` (at project root, symlinked from `templates/Caddyfile`)
 | Referrer-Policy | `strict-origin-when-cross-origin` |
 | Permissions-Policy | `camera=(), microphone=(), geolocation=()` |
 | CSP | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'` |
+
+### Client IP Forwarding
+
+Without explicit configuration, Caddy replaces proxy headers with the connecting client's IP. In this stack, the connecting client is the Cloudflare Tunnel container — a Docker-internal IP (`172.x.x.x`), not the real user. The application would see all traffic as coming from the same internal address.
+
+The Caddyfile uses `header_up` to preserve the original headers from Cloudflare:
+
+```
+reverse_proxy webapp:3000 {
+    header_up CF-Connecting-IP {http.request.header.CF-Connecting-IP}
+    header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+}
+```
+
+**How the headers work:**
+
+| Header | Set by | Contains |
+|--------|--------|----------|
+| `CF-Connecting-IP` | Cloudflare edge | The real client IP (verified by Cloudflare, cannot be spoofed by clients) |
+| `X-Forwarded-For` | Cloudflare edge | The real client IP; Caddy appends the tunnel IP, so the app sees `<real-ip>, <tunnel-ip>` |
+
+**Accessing the client IP in your application:**
+
+```typescript
+// Next.js (App Router)
+import { headers } from "next/headers";
+
+const h = await headers();
+const clientIp = h.get("cf-connecting-ip")           // preferred — verified by Cloudflare
+  ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() // fallback — first entry is the real IP
+  ?? h.get("x-real-ip")
+  ?? "127.0.0.1";
+```
+
+**Why this matters:**
+
+- **Rate limiting** — Per-IP rate limits work correctly (each user gets their own bucket, not all sharing the tunnel IP).
+- **IP banning** — Bans target the actual offending IP, not the Docker container.
+- **Logging** — Server logs show real client IPs for debugging and audit trails.
+- **Geo/restriction** — Applications that need geolocation or IP-based access control get accurate data.
 
 ### Health Checks
 
